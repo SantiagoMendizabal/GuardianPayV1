@@ -1,3 +1,4 @@
+HEAD
 # GuardianPay - Billetera Digital & Detección de Fraude con IA
 
 Proyecto modularizado listo para el desarrollo de la Billetera Digital Fintech y su posterior integración con el modelo de Machine Learning (**Random Forest**).
@@ -47,3 +48,5 @@ En la siguiente etapa, se configurará en la carpeta `/backend` un microservicio
 - Python (`scikit-learn`, `fastapi`, `uvicorn`)
 - Modelo Random Forest (`.pkl`) entrenado con patrones de transacciones.
 - Endpoint REST para predecir la probabilidad de fraude en tiempo real desde el frontend.
+=======
+# GuardianPayV1
