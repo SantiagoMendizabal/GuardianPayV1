@@ -19,7 +19,8 @@ import { calcularRiesgoIA } from '../services/aiFraudEngine';
 export default function TransferScreen({
   user,
   onBack,
-  onConfirmTransfer
+  onConfirmTransfer,
+  onInputChange
 }) {
   const [recipientPhone, setRecipientPhone] = useState('981234567');
   const [amount, setAmount] = useState('25.00');
@@ -30,6 +31,18 @@ export default function TransferScreen({
   const [selectedLocation, setSelectedLocation] = useState('Arequipa'); // 'Arequipa' | 'Inusual / IP Extranjera'
   
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Sync with parent for live desktop telemetry
+  useEffect(() => {
+    if (onInputChange) {
+      onInputChange({
+        monto: parseFloat(amount) || 0,
+        selectedTime,
+        isFrequentContact,
+        selectedLocation
+      });
+    }
+  }, [amount, selectedTime, isFrequentContact, selectedLocation, onInputChange]);
 
   // Live Risk Calculation Preview
   const currentRisk = calcularRiesgoIA({

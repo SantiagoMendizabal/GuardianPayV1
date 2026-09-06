@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import PhoneMockup from './components/PhoneMockup';
+import ResponsiveLayout from './components/ResponsiveLayout';
 import LoginScreen from './components/LoginScreen';
 import DashboardScreen from './components/DashboardScreen';
 import TransferScreen from './components/TransferScreen';
@@ -156,9 +156,15 @@ export default function App() {
   };
 
   return (
-    <PhoneMockup
-      isInspectorOpen={isInspectorOpen}
-      onToggleInspector={() => setIsInspectorOpen(!isInspectorOpen)}
+    <ResponsiveLayout
+      currentScreen={currentScreen}
+      user={user}
+      transactions={transactions}
+      onNavigate={(screen) => setCurrentScreen(screen)}
+      onLogout={handleLogout}
+      currentRisk={riskResult || currentInspectorRisk}
+      liveInputs={liveInputs}
+      onUpdateInput={(key, val) => setLiveInputs(prev => ({ ...prev, [key]: val }))}
     >
       {/* 1. Login Screen */}
       {currentScreen === 'LOGIN' && (
@@ -183,6 +189,7 @@ export default function App() {
           user={user}
           onBack={() => setCurrentScreen('DASHBOARD')}
           onConfirmTransfer={handleConfirmTransfer}
+          onInputChange={(inputs) => setLiveInputs(inputs)}
         />
       )}
 
@@ -217,13 +224,13 @@ export default function App() {
         <BiometricModal onComplete={handleBiometricComplete} />
       )}
 
-      {/* AI Inspector Drawer (Bottom Sheet) */}
+      {/* AI Inspector Drawer (Solo en móvil cuando se activa el toggle) */}
       <AiInspectorDrawer
         isOpen={isInspectorOpen}
         onClose={() => setIsInspectorOpen(false)}
         currentRisk={riskResult || currentInspectorRisk}
         currentInputs={liveInputs}
       />
-    </PhoneMockup>
+    </ResponsiveLayout>
   );
 }
