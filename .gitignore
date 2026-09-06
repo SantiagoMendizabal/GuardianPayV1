@@ -1,0 +1,26 @@
+# Dependencias
+node_modules/
+*/node_modules/
+frontend/node_modules/
+
+# Compilaciones y distribución
+dist/
+*/dist/
+frontend/dist/
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
