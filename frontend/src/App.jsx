@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import ResponsiveLayout from './components/ResponsiveLayout';
 import LoginScreen from './components/LoginScreen';
 import DashboardScreen from './components/DashboardScreen';
@@ -29,6 +29,8 @@ export default function App() {
   // Current Transaction Payload & AI Result
   const [pendingTx, setPendingTx] = useState(null);
   const [riskResult, setRiskResult] = useState(null);
+  const pendingTxRef = useRef(null);
+  const riskResultRef = useRef(null);
 
   // State for Inspector Live Preview (inputs tracked during transfer)
   const [liveInputs, setLiveInputs] = useState({
@@ -94,6 +96,8 @@ export default function App() {
       type: "egreso"
     };
 
+    pendingTxRef.current = fullTx;
+    riskResultRef.current = evaluatedRisk;
     setPendingTx(fullTx);
     setRiskResult(evaluatedRisk);
 
@@ -104,26 +108,29 @@ export default function App() {
   // After 1-second AI evaluation finishes:
   const handleEvaluationComplete = () => {
     setIsEvaluating(false);
+    const risk = riskResultRef.current || riskResult;
+    const tx = pendingTxRef.current || pendingTx;
 
-    if (riskResult && riskResult.score >= 70) {
+    if (risk && risk.score >= 70) {
       // Risk is high -> Intercept with Fraud Alert Screen
       setCurrentScreen('FRAUD_ALERT');
-    } else {
+    } else if (tx) {
       // Low/Normal risk -> Deduct balance, add to history and show Voucher
-      executeTransferSuccess();
+      executeTransferSuccess(tx);
     }
   };
 
   // Helper to complete the transfer (deduct balance & record transaction)
-  const executeTransferSuccess = () => {
-    if (!pendingTx) return;
+  const executeTransferSuccess = (txToExecute = pendingTxRef.current) => {
+    const tx = txToExecute || pendingTx;
+    if (!tx) return;
 
     // Deduct balance
-    const newBalance = user.balance - Math.abs(pendingTx.amount);
+    const newBalance = user.balance - Math.abs(tx.amount);
     setUser(prev => ({ ...prev, balance: newBalance }));
 
     // Add to transactions history
-    const completedTx = { ...pendingTx, status: "completado" };
+    const completedTx = { ...tx, status: "completado" };
     setTransactions(prev => [completedTx, ...prev]);
 
     setCurrentScreen('VOUCHER');
@@ -138,7 +145,7 @@ export default function App() {
   const handleBiometricComplete = () => {
     setIsBiometricScanOpen(false);
     // Verified successfully -> proceed to voucher!
-    executeTransferSuccess();
+    executeTransferSuccess(pendingTxRef.current);
   };
 
   // Cancel and protect account

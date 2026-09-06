@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Cpu, ShieldCheck, Sparkles, Activity } from 'lucide-react';
 
 export default function EvaluatingOverlay({ onFinished, currentRisk }) {
   const [stepIndex, setStepIndex] = useState(0);
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
 
   const steps = [
     "Analizando telemetría del dispositivo...",
@@ -16,17 +18,19 @@ export default function EvaluatingOverlay({ onFinished, currentRisk }) {
     }, 320);
 
     const timer = setTimeout(() => {
-      onFinished();
+      if (onFinishedRef.current) {
+        onFinishedRef.current();
+      }
     }, 1100);
 
     return () => {
       clearInterval(stepInterval);
       clearTimeout(timer);
     };
-  }, [onFinished]);
+  }, []); // Run once on mount to guarantee completion!
 
   return (
-    <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in">
       
       {/* Radar Pulse Animation */}
       <div className="relative w-28 h-28 flex items-center justify-center mb-6">
@@ -60,7 +64,7 @@ export default function EvaluatingOverlay({ onFinished, currentRisk }) {
       <div className="mt-6 w-full max-w-[220px] bg-white/5 border border-white/10 rounded-xl p-2.5">
         <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
           <span>Inferencia Local</span>
-          <span className="text-mint font-mono font-bold">98.7% Confianza</span>
+          <span className="text-mint font-sans font-black">98.7% Confianza</span>
         </div>
         <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
           <div 

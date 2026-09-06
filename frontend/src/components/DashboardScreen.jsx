@@ -76,7 +76,7 @@ export default function DashboardScreen({
 
           <div className="flex items-baseline gap-2 py-1">
             <span className="text-sm font-extrabold text-mint">S/</span>
-            <span className="text-2xl sm:text-3xl font-black tracking-tight text-white font-mono">
+            <span className="text-2xl sm:text-3xl font-black tracking-tight text-white font-sans">
               {showBalance 
                 ? Number(user.balance).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 : "••••••"
@@ -162,7 +162,7 @@ export default function DashboardScreen({
 
                   {/* Right: Amount with + (green) or - (red) */}
                   <div className="text-right">
-                    <div className={`text-xs font-black font-mono tracking-tight ${
+                    <div className={`text-xs font-black font-sans tracking-tight ${
                       isIncome ? 'text-emerald-600' : 'text-red-500'
                     }`}>
                       {isIncome ? "+ " : "- "}S/ {Math.abs(tx.amount).toFixed(2)}

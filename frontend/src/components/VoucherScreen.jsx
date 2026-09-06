@@ -87,7 +87,7 @@ export default function VoucherScreen({
           <span className="text-xs font-bold text-slate-500 block mb-0.5">Monto Total</span>
           <div className="flex items-baseline justify-center gap-1">
             <span className="text-sm font-black text-yape-700">S/</span>
-            <span className="text-3xl font-black tracking-tight text-yape-700 font-mono">
+            <span className="text-3xl font-black tracking-tight text-yape-700 font-sans">
               {Math.abs(Number(amount)).toFixed(2)}
             </span>
           </div>
@@ -123,7 +123,7 @@ export default function VoucherScreen({
             </span>
             <div className="text-right">
               <span className="font-bold text-slate-800">{recipient}</span>
-              <span className="block text-[10px] text-slate-500 font-mono">{recipientPhone}</span>
+              <span className="block text-[10px] text-slate-500 font-sans font-bold">{recipientPhone}</span>
             </div>
           </div>
 
@@ -140,7 +140,7 @@ export default function VoucherScreen({
               <Hash className="w-3.5 h-3.5 text-slate-400" />
               N° Operación
             </span>
-            <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+            <span className="font-sans font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
               {operationCode}
             </span>
           </div>
