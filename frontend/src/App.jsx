@@ -9,7 +9,7 @@ import FraudAlertScreen from './components/FraudAlertScreen';
 import BiometricModal from './components/BiometricModal';
 import AiInspectorDrawer from './components/AiInspectorDrawer';
 import { INITIAL_USER, INITIAL_TRANSACTIONS } from './data/mockData';
-import { calcularRiesgoIA } from './services/aiFraudEngine';
+import { calcularRiesgoIA, evaluarFraudeAPI } from './services/aiFraudEngine';
 
 export default function App() {
   // Navigation State
@@ -64,8 +64,8 @@ export default function App() {
   };
 
   // Trigger transfer confirmation
-  const handleConfirmTransfer = (txPayload) => {
-    const { amount, selectedTime, isFrequentContact, selectedLocation, recipientPhone, riskResult: preCalculatedRisk } = txPayload;
+  const handleConfirmTransfer = async (txPayload) => {
+    const { amount, selectedTime, isFrequentContact, selectedLocation, recipientPhone } = txPayload;
 
     setLiveInputs({
       monto: amount,
@@ -74,48 +74,65 @@ export default function App() {
       selectedLocation
     });
 
-    const evaluatedRisk = preCalculatedRisk || calcularRiesgoIA({
-      monto: amount,
-      hora: selectedTime,
-      esContactoNuevo: !isFrequentContact,
-      esUbicacionInusual: selectedLocation !== 'Arequipa'
-    });
-
-    const randomOpCode = `OP-${Math.floor(10000000 + Math.random() * 90000000)}`;
-    const fullTx = {
-      id: `tx-${Date.now()}`,
-      title: isFrequentContact ? "Transferencia a Contacto" : "Transferencia a Cuenta Nueva",
-      category: "Transferencia",
-      amount: -amount,
-      recipient: isFrequentContact ? "Lucía Gómez" : "Destinatario Celular",
-      recipientPhone,
-      operationCode: randomOpCode,
-      date: `Hoy, ${selectedTime.replace(' AM', '')}`,
-      riskScore: evaluatedRisk.score,
-      status: "procesando",
-      type: "egreso"
-    };
-
-    pendingTxRef.current = fullTx;
-    riskResultRef.current = evaluatedRisk;
-    setPendingTx(fullTx);
-    setRiskResult(evaluatedRisk);
-
-    // 1 second AI evaluation spinner simulation
+    // Activar animación de evaluación por IA
     setIsEvaluating(true);
+
+    try {
+      // Inferencia asíncrona con FastAPI / Random Forest en paralelo con la animación de radar
+      const [evaluatedRisk] = await Promise.all([
+        evaluarFraudeAPI({
+          monto: amount,
+          hora: selectedTime,
+          esContactoNuevo: !isFrequentContact,
+          esUbicacionInusual: selectedLocation !== 'Arequipa',
+          saldoPrevio: user.balance
+        }),
+        new Promise((resolve) => setTimeout(resolve, 1100))
+      ]);
+
+      const randomOpCode = `OP-${Math.floor(10000000 + Math.random() * 90000000)}`;
+      const fullTx = {
+        id: `tx-${Date.now()}`,
+        title: isFrequentContact ? "Transferencia a Contacto" : "Transferencia a Cuenta Nueva",
+        category: "Transferencia",
+        amount: -amount,
+        recipient: isFrequentContact ? "Lucía Gómez" : "Destinatario Celular",
+        recipientPhone,
+        operationCode: randomOpCode,
+        date: `Hoy, ${selectedTime.replace(' AM', '')}`,
+        riskScore: evaluatedRisk.score,
+        status: "procesando",
+        type: "egreso"
+      };
+
+      pendingTxRef.current = fullTx;
+      riskResultRef.current = evaluatedRisk;
+      setPendingTx(fullTx);
+      setRiskResult(evaluatedRisk);
+      setIsEvaluating(false);
+
+      if (evaluatedRisk.isBlocked || evaluatedRisk.score >= 70) {
+        // Riesgo crítico -> Interceptar con alerta de fraude
+        setCurrentScreen('FRAUD_ALERT');
+      } else {
+        // Riesgo bajo/medio -> Ejecutar transferencia
+        executeTransferSuccess(fullTx);
+      }
+    } catch (err) {
+      console.error('Error durante la evaluación de riesgo:', err);
+      setIsEvaluating(false);
+    }
   };
 
-  // After 1-second AI evaluation finishes:
+  // After 1-second AI evaluation finishes (mantenido por compatibilidad):
   const handleEvaluationComplete = () => {
     setIsEvaluating(false);
     const risk = riskResultRef.current || riskResult;
     const tx = pendingTxRef.current || pendingTx;
 
-    if (risk && risk.score >= 70) {
-      // Risk is high -> Intercept with Fraud Alert Screen
+    if (risk && (risk.isBlocked || risk.score >= 70)) {
       setCurrentScreen('FRAUD_ALERT');
     } else if (tx) {
-      // Low/Normal risk -> Deduct balance, add to history and show Voucher
       executeTransferSuccess(tx);
     }
   };

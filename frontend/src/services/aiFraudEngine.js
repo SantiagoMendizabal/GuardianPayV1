@@ -1,5 +1,8 @@
+import axios from 'axios';
+
 /**
- * Motor Simulado de Inteligencia Artificial para Detección de Fraude en Tiempo Real
+ * Motor de Inteligencia Artificial para Detección de Fraude en Tiempo Real
+
  * GuardianPay ML Risk Engine (Edge / Client-Side)
  * 
  * Reglas de Scoring:
@@ -182,3 +185,79 @@ export function calcularRiesgoIA({
     modelVersion: "GuardianShield-v3.4-Light"
   };
 }
+
+// ---------------------------------------------------------------------------
+// Conexión Cliente-Servidor mediante Axios hacia Microservicio FastAPI (GP-104)
+// ---------------------------------------------------------------------------
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+/**
+ * HealthCheck para verificar si el microservicio en Python (FastAPI) está online
+ */
+export async function verificarEstadoBackend() {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/health`, { timeout: 2000 });
+    return { online: true, data: res.data };
+  } catch (e) {
+    return { online: false, error: e.message };
+  }
+}
+
+/**
+ * Inferencia predictiva mediante Axios con patrón Resilient Circuit Breaker
+ * 1. Intenta conectarse al endpoint FastAPI /api/v1/predict
+ * 2. Si el servidor está apagado o hay timeout, conmuta al motor local
+ */
+export async function evaluarFraudeAPI({
+  monto = 0,
+  hora = "14:30",
+  esContactoNuevo = false,
+  esUbicacionInusual = false,
+  saldoPrevio = 1500,
+  intentosFallidos = 0
+}) {
+  const numericAmount = parseFloat(monto) || 0;
+
+  const payload = {
+    monto: numericAmount,
+    hora,
+    es_contacto_nuevo: esContactoNuevo ? 1 : 0,
+    es_ubicacion_inusual: esUbicacionInusual ? 1 : 0,
+    saldo_previo: parseFloat(saldoPrevio) || 1500.0,
+    intentos_fallidos: parseInt(intentosFallidos, 10) || 0
+  };
+
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/v1/predict`, payload, {
+      timeout: 3000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.data && typeof response.data.score === 'number') {
+      return {
+        ...response.data,
+        isOnlinePrediction: true,
+        source: 'FastAPI Microservice (Random Forest model.pkl)'
+      };
+    }
+  } catch (error) {
+    console.warn('[GuardianPay] Backend FastAPI no disponible. Conmutando a Circuit Breaker local:', error.message);
+  }
+
+  // Fallback de contingencia si la API falla o está offline
+  const fallbackResult = calcularRiesgoIA({
+    monto: numericAmount,
+    hora,
+    esContactoNuevo,
+    esUbicacionInusual
+  });
+
+  return {
+    ...fallbackResult,
+    isOnlinePrediction: false,
+    source: 'Motor Local de Contingencia (Offline Fallback)'
+  };
+}
+
