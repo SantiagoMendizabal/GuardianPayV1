@@ -24,3 +24,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Python & Entornos Virtuales
+venv/
+backend/venv/
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+
