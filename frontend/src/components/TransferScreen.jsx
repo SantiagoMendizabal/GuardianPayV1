@@ -27,7 +27,10 @@ export default function TransferScreen({
 }) {
   const [recipientPhone, setRecipientPhone] = useState('981234567');
   const [amount, setAmount] = useState('25.00');
-  const [isFrequentContact, setIsFrequentContact] = useState(true);
+
+  // Detección 100% AUTOMÁTICA: El sistema analiza por detrás si el número está en la agenda
+  const matchedContact = FREQUENT_CONTACTS.find(c => c.phone === recipientPhone.trim());
+  const isFrequentContact = Boolean(matchedContact);
   
   // Saldo visible u oculto
   const [showBalance, setShowBalance] = useState(false);
@@ -74,8 +77,7 @@ export default function TransferScreen({
   // Atajo: Cargar Escenario Normal
   const handleLoadNormalScenario = () => {
     setAmount('25.00');
-    setRecipientPhone('981234567'); // Lucía Gómez
-    setIsFrequentContact(true);
+    setRecipientPhone('981234567'); // Lucía Gómez (registrada en agenda)
     setSelectedTime('14:30');
     setSelectedLocation('Arequipa');
     setErrorMsg('');
@@ -84,8 +86,7 @@ export default function TransferScreen({
   // Atajo: Cargar Escenario de Fraude
   const handleLoadFraudScenario = () => {
     setAmount('480.00');
-    setRecipientPhone('993441122'); // Contacto nuevo
-    setIsFrequentContact(false);
+    setRecipientPhone('970203193'); // Número no registrado (nuevo contacto)
     setSelectedTime('03:45 AM');
     setSelectedLocation('Inusual / IP Extranjera');
     setErrorMsg('');
@@ -189,10 +190,7 @@ export default function TransferScreen({
               <button
                 key={c.phone}
                 type="button"
-                onClick={() => {
-                  setRecipientPhone(c.phone);
-                  setIsFrequentContact(true);
-                }}
+                onClick={() => setRecipientPhone(c.phone)}
                 className={`px-2 py-1 rounded-lg text-[10px] font-bold shrink-0 border transition-all cursor-pointer ${
                   recipientPhone === c.phone
                     ? 'bg-yape-700 text-white border-yape-700 shadow-sm'
@@ -203,6 +201,28 @@ export default function TransferScreen({
               </button>
             ))}
           </div>
+
+          {/* Detección 100% Automática por la IA del Sistema */}
+          {recipientPhone.length === 9 && (
+            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs animate-fade-in">
+              {matchedContact ? (
+                <div className="flex items-center gap-1.5 text-emerald-700 font-semibold text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Contacto registrado: <strong className="text-slate-900">{matchedContact.name}</strong></span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-amber-700 font-semibold text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span>Destinatario no registrado <span className="text-[10px] text-amber-600 font-normal">(Nuevo contacto)</span></span>
+                </div>
+              )}
+              <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                matchedContact ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
+              }`}>
+                {matchedContact ? 'Frecuente' : 'Nuevo'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Amount Field */}
@@ -259,43 +279,6 @@ export default function TransferScreen({
           </div>
         </div>
 
-        {/* Toggle Contacto Frecuente */}
-        <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-              isFrequentContact ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-            }`}>
-              {isFrequentContact ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-800">¿Contacto frecuente?</div>
-              <div className="text-[10px] text-slate-400">
-                {isFrequentContact ? "Registrado previamente (+0%)" : "Nuevo destinatario (+15%)"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setIsFrequentContact(true)}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                isFrequentContact ? 'bg-yape-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Sí
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsFrequentContact(false)}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                !isFrequentContact ? 'bg-red-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              No
-            </button>
-          </div>
-        </div>
 
         {/* PANEL DE PRUEBAS PARA DEMOSTRACIÓN - Colapsable por defecto */}
         <div className="space-y-2">
