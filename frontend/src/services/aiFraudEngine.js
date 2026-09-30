@@ -189,7 +189,7 @@ export function calcularRiesgoIA({
 // ---------------------------------------------------------------------------
 // Conexión Cliente-Servidor mediante Axios hacia Microservicio FastAPI (GP-104)
 // ---------------------------------------------------------------------------
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://guardianpay-api.onrender.com';
 
 /**
  * HealthCheck para verificar si el microservicio en Python (FastAPI) está online
