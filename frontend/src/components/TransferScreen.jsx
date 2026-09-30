@@ -11,7 +11,10 @@ import {
   ShieldAlert, 
   Sliders, 
   Sparkles,
-  Smartphone
+  Smartphone,
+  Eye,
+  EyeOff,
+  ChevronDown
 } from 'lucide-react';
 import { FREQUENT_CONTACTS } from '../data/mockData';
 import { calcularRiesgoIA } from '../services/aiFraudEngine';
@@ -26,7 +29,11 @@ export default function TransferScreen({
   const [amount, setAmount] = useState('25.00');
   const [isFrequentContact, setIsFrequentContact] = useState(true);
   
-  // Panel de pruebas para demostración
+  // Saldo visible u oculto
+  const [showBalance, setShowBalance] = useState(false);
+
+  // Panel de pruebas para demostración (colapsado por defecto para vista 100% real)
+  const [isDemoPanelOpen, setIsDemoPanelOpen] = useState(false);
   const [selectedTime, setSelectedTime] = useState('14:30'); // '14:30' | '03:45 AM'
   const [selectedLocation, setSelectedLocation] = useState('Arequipa'); // 'Arequipa' | 'Inusual / IP Extranjera'
   
@@ -204,9 +211,21 @@ export default function TransferScreen({
             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Monto a Transferir
             </label>
-            <span className="text-[11px] text-slate-400">
-              Saldo: <b className="text-slate-700">S/ {user.balance.toFixed(2)}</b>
-            </span>
+            <button
+              type="button"
+              onClick={() => setShowBalance(!showBalance)}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-yape-700 transition-colors cursor-pointer bg-slate-100/80 px-2 py-0.5 rounded-lg border border-slate-200"
+              title="Mostrar u ocultar saldo"
+            >
+              <span>Saldo:</span>
+              <b className="text-slate-800 font-sans">
+                {showBalance 
+                  ? `S/ ${user.balance.toFixed(2)}` 
+                  : "S/ ••••••"
+                }
+              </b>
+              {showBalance ? <EyeOff className="w-3 h-3 text-slate-500" /> : <Eye className="w-3 h-3 text-slate-500" />}
+            </button>
           </div>
 
           <div className="relative flex items-center">
@@ -278,101 +297,131 @@ export default function TransferScreen({
           </div>
         </div>
 
-        {/* PANEL DE PRUEBAS PARA DEMOSTRACIÓN - Solid Static Colors */}
-        <div className="bg-slate-900 text-white p-3.5 rounded-2xl border border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-mint" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-mint">
-                Panel de Pruebas (Demo)
-              </span>
+        {/* PANEL DE PRUEBAS PARA DEMOSTRACIÓN - Colapsable por defecto */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setIsDemoPanelOpen(!isDemoPanelOpen)}
+            className="w-full flex items-center justify-between p-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs text-slate-700 transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl bg-yape-700 text-white flex items-center justify-center font-bold shadow-xs">
+                <Sliders className="w-3.5 h-3.5 text-mint" />
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>Simulador de Escenarios IA</span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-mint/20 text-yape-800 font-bold border border-mint/40">Demo Tester</span>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {isDemoPanelOpen ? "Haz clic para ocultar controles de prueba" : "Simular horarios nocturnos, IPs sospechosas o fraudes"}
+                </div>
+              </div>
             </div>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">IA Tester</span>
-          </div>
 
-          {/* Selector de Hora */}
-          <div className="mb-2.5">
-            <div className="text-[10px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
-              <Clock className="w-3 h-3 text-yape-300" />
-              <span>Simulación de Hora:</span>
+            <div className="flex items-center gap-1 text-xs font-bold text-yape-700">
+              <span className="text-[11px]">{isDemoPanelOpen ? "Ocultar" : "Abrir"}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isDemoPanelOpen ? 'rotate-180' : ''}`} />
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedTime('14:30')}
-                className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                  selectedTime === '14:30'
-                    ? 'bg-yape-700 border-mint text-white shadow-sm'
-                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                }`}
-              >
-                ☀️ Día (14:30)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedTime('03:45 AM')}
-                className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                  selectedTime === '03:45 AM'
-                    ? 'bg-red-900/80 border-red-500 text-red-200 shadow-sm'
-                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                }`}
-              >
-                🌙 Madrugada (03:45 AM)
-              </button>
-            </div>
-          </div>
+          </button>
 
-          {/* Selector de Ubicación */}
-          <div className="mb-3">
-            <div className="text-[10px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-yape-300" />
-              <span>Ubicación / IP:</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedLocation('Arequipa')}
-                className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                  selectedLocation === 'Arequipa'
-                    ? 'bg-yape-700 border-mint text-white shadow-sm'
-                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                }`}
-              >
-                📍 Arequipa (Habitual)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedLocation('Inusual / IP Extranjera')}
-                className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
-                  selectedLocation === 'Inusual / IP Extranjera'
-                    ? 'bg-red-900/80 border-red-500 text-red-200 shadow-sm'
-                    : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                }`}
-              >
-                🌐 Inusual (IP Remota)
-              </button>
-            </div>
-          </div>
+          {isDemoPanelOpen && (
+            <div className="bg-slate-900 text-white p-3.5 rounded-2xl border border-slate-800 shadow-sm animate-slide-up space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                <div className="flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-mint" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-mint">
+                    Controles de Simulación Contextual
+                  </span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-slate-300 font-mono">Para Sustentación</span>
+              </div>
 
-          {/* Atajos Rápidos de Escenarios */}
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10">
-            <button
-              type="button"
-              onClick={handleLoadNormalScenario}
-              className="py-2 px-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              <Zap className="w-3 h-3 text-mint" />
-              <span>Escenario Normal</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleLoadFraudScenario}
-              className="py-2 px-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              <ShieldAlert className="w-3 h-3 text-red-400" />
-              <span>Escenario Fraude</span>
-            </button>
-          </div>
+              {/* Selector de Hora */}
+              <div>
+                <div className="text-[10px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-yape-300" />
+                  <span>Simulación de Hora:</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTime('14:30')}
+                    className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedTime === '14:30'
+                        ? 'bg-yape-700 border-mint text-white shadow-sm'
+                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    ☀️ Día (14:30)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTime('03:45 AM')}
+                    className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedTime === '03:45 AM'
+                        ? 'bg-red-900/80 border-red-500 text-red-200 shadow-sm'
+                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    🌙 Madrugada (03:45 AM)
+                  </button>
+                </div>
+              </div>
+
+              {/* Selector de Ubicación */}
+              <div>
+                <div className="text-[10px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-yape-300" />
+                  <span>Ubicación / IP:</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLocation('Arequipa')}
+                    className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedLocation === 'Arequipa'
+                        ? 'bg-yape-700 border-mint text-white shadow-sm'
+                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    📍 Arequipa (Habitual)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLocation('Inusual / IP Extranjera')}
+                    className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedLocation === 'Inusual / IP Extranjera'
+                        ? 'bg-red-900/80 border-red-500 text-red-200 shadow-sm'
+                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    🌐 Inusual (IP Remota)
+                  </button>
+                </div>
+              </div>
+
+              {/* Atajos Rápidos de Escenarios */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={handleLoadNormalScenario}
+                  className="py-2 px-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                >
+                  <Zap className="w-3 h-3 text-mint" />
+                  <span>Escenario Normal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLoadFraudScenario}
+                  className="py-2 px-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                >
+                  <ShieldAlert className="w-3 h-3 text-red-400" />
+                  <span>Escenario Fraude</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Botón Confirmar Transferencia */}
