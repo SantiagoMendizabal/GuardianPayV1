@@ -9,7 +9,7 @@ import FraudAlertScreen from './components/FraudAlertScreen';
 import BiometricModal from './components/BiometricModal';
 import AiInspectorDrawer from './components/AiInspectorDrawer';
 import { INITIAL_USER, INITIAL_TRANSACTIONS } from './data/mockData';
-import { calcularRiesgoIA, evaluarFraudeAPI } from './services/aiFraudEngine';
+import { calcularRiesgoIA, evaluarFraudeAPI, ejecutarTransferenciaAPI } from './services/aiFraudEngine';
 
 export default function App() {
   // Navigation State
@@ -53,8 +53,11 @@ export default function App() {
     setUser({
       ...user,
       ...userData,
-      balance: user.balance // keep current balance
+      balance: typeof userData.balance === 'number' ? userData.balance : user.balance
     });
+    if (userData.transactions && userData.transactions.length > 0) {
+      setTransactions(userData.transactions);
+    }
     setCurrentScreen('DASHBOARD');
   };
 
@@ -63,9 +66,9 @@ export default function App() {
     setCurrentScreen('LOGIN');
   };
 
-  // Trigger transfer confirmation
+  // Trigger transfer confirmation against MySQL & AI Engine
   const handleConfirmTransfer = async (txPayload) => {
-    const { amount, selectedTime, isFrequentContact, selectedLocation, recipientPhone } = txPayload;
+    const { amount, selectedTime, isFrequentContact, selectedLocation, recipientPhone, recipientName } = txPayload;
 
     setLiveInputs({
       monto: amount,
@@ -74,83 +77,149 @@ export default function App() {
       selectedLocation
     });
 
-    // Activar animación de evaluación por IA
+    // Activar animación de radar de evaluación
     setIsEvaluating(true);
 
     try {
-      // Inferencia asíncrona con FastAPI / Random Forest en paralelo con la animación de radar
-      const [evaluatedRisk] = await Promise.all([
-        evaluarFraudeAPI({
-          monto: amount,
+      // Llamada atómica al backend MySQL con Random Forest
+      const [backendRes] = await Promise.all([
+        ejecutarTransferenciaAPI({
+          senderPhone: user.phone,
+          recipientPhone,
+          amount,
           hora: selectedTime,
-          esContactoNuevo: !isFrequentContact,
-          esUbicacionInusual: selectedLocation !== 'Arequipa',
-          saldoPrevio: user.balance
+          location: selectedLocation,
+          forceApprove: false
         }),
         new Promise((resolve) => setTimeout(resolve, 1100))
       ]);
 
-      const randomOpCode = `OP-${Math.floor(10000000 + Math.random() * 90000000)}`;
-      const fullTx = {
-        id: `tx-${Date.now()}`,
-        title: isFrequentContact ? "Transferencia a Contacto" : "Transferencia a Cuenta Nueva",
-        category: "Transferencia",
-        amount: -amount,
-        recipient: isFrequentContact ? "Lucía Gómez" : "Destinatario Celular",
-        recipientPhone,
-        operationCode: randomOpCode,
-        date: `Hoy, ${selectedTime.replace(' AM', '')}`,
-        riskScore: evaluatedRisk.score,
-        status: "procesando",
-        type: "egreso"
-      };
+      if (backendRes.is_blocked) {
+        // Interceptado por alta probabilidad de fraude (>= 70%) -> Exigir desafío biométrico
+        const pending = {
+          id: `tx-pending-${Date.now()}`,
+          title: `Transferencia a ${recipientName || 'Destinatario'}`,
+          category: "Transferencia",
+          amount: -amount,
+          recipient: recipientName || "Destinatario",
+          recipientPhone,
+          operationCode: "OP-INTERCEPTADA",
+          date: `Hoy, ${selectedTime.replace(' AM', '')}`,
+          riskScore: backendRes.risk_result?.score || 75.0,
+          status: "bloqueado",
+          type: "egreso",
+          payloadForApproval: {
+            senderPhone: user.phone,
+            recipientPhone,
+            amount,
+            hora: selectedTime,
+            location: selectedLocation,
+            forceApprove: true
+          }
+        };
 
-      pendingTxRef.current = fullTx;
-      riskResultRef.current = evaluatedRisk;
-      setPendingTx(fullTx);
-      setRiskResult(evaluatedRisk);
-      setIsEvaluating(false);
-
-      if (evaluatedRisk.isBlocked || evaluatedRisk.score >= 70) {
-        // Riesgo crítico -> Interceptar con alerta de fraude
+        pendingTxRef.current = pending;
+        riskResultRef.current = backendRes.risk_result;
+        setPendingTx(pending);
+        setRiskResult(backendRes.risk_result);
+        setIsEvaluating(false);
         setCurrentScreen('FRAUD_ALERT');
-      } else {
-        // Riesgo bajo/medio -> Ejecutar transferencia
-        executeTransferSuccess(fullTx);
+        return;
+      }
+
+      if (backendRes.success) {
+        // Transferencia completada atómicamente en MySQL
+        const completedTx = backendRes.transaction;
+        pendingTxRef.current = completedTx;
+        riskResultRef.current = backendRes.risk_result;
+        setPendingTx(completedTx);
+        setRiskResult(backendRes.risk_result);
+        setIsEvaluating(false);
+
+        // Actualizar saldo emisor en tiempo real desde MySQL
+        setUser(prev => ({ ...prev, balance: backendRes.sender_new_balance }));
+        // Insertar en historial local
+        setTransactions(prev => [completedTx, ...prev]);
+
+        setCurrentScreen('VOUCHER');
+        return;
+      }
+
+      if (backendRes.error) {
+        setIsEvaluating(false);
+        alert(backendRes.error);
+        return;
       }
     } catch (err) {
-      console.error('Error durante la evaluación de riesgo:', err);
+      console.warn('Backend no disponible, ejecutando en modo de contingencia local:', err);
       setIsEvaluating(false);
+
+      // Evaluación de contingencia usando el motor local de IA
+      const fallbackRisk = calcularRiesgoIA({
+        monto: amount,
+        hora: selectedTime,
+        esContactoNuevo: !isFrequentContact,
+        esUbicacionInusual: selectedLocation !== 'Arequipa'
+      });
+
+      if (fallbackRisk.isBlocked) {
+        const pending = {
+          id: `tx-fallback-${Date.now()}`,
+          title: `Transferencia a ${recipientName || 'Destinatario'}`,
+          category: "Transferencia",
+          amount: -amount,
+          recipient: recipientName || "Destinatario",
+          recipientPhone,
+          operationCode: "OP-INTERCEPTADA",
+          date: `Hoy, ${selectedTime.replace(' AM', '')}`,
+          riskScore: fallbackRisk.score,
+          status: "bloqueado",
+          type: "egreso",
+          payloadForApproval: {
+            senderPhone: user.phone,
+            recipientPhone,
+            amount,
+            hora: selectedTime,
+            location: selectedLocation,
+            forceApprove: true
+          }
+        };
+        pendingTxRef.current = pending;
+        riskResultRef.current = fallbackRisk;
+        setPendingTx(pending);
+        setRiskResult(fallbackRisk);
+        setCurrentScreen('FRAUD_ALERT');
+        return;
+      } else {
+        const fallbackTx = {
+          id: `tx-${Date.now()}`,
+          operationCode: `OP-${Math.floor(10000000 + Math.random() * 90000000)}`,
+          amount: -amount,
+          title: `Transferencia a ${recipientName || 'Destinatario'}`,
+          category: "Transferencia",
+          recipient: recipientName || "Destinatario",
+          recipientPhone,
+          date: `Hoy, ${selectedTime.replace(' AM', '')}`,
+          riskScore: fallbackRisk.score,
+          riskLevel: fallbackRisk.riskLevel,
+          status: "completado",
+          type: "egreso"
+        };
+        pendingTxRef.current = fallbackTx;
+        riskResultRef.current = fallbackRisk;
+        setPendingTx(fallbackTx);
+        setRiskResult(fallbackRisk);
+        setUser(prev => ({ ...prev, balance: prev.balance - amount }));
+        setTransactions(prev => [fallbackTx, ...prev]);
+        setCurrentScreen('VOUCHER');
+        return;
+      }
     }
   };
 
-  // After 1-second AI evaluation finishes (mantenido por compatibilidad):
+  // Callback para finalizar overlay de radar
   const handleEvaluationComplete = () => {
     setIsEvaluating(false);
-    const risk = riskResultRef.current || riskResult;
-    const tx = pendingTxRef.current || pendingTx;
-
-    if (risk && (risk.isBlocked || risk.score >= 70)) {
-      setCurrentScreen('FRAUD_ALERT');
-    } else if (tx) {
-      executeTransferSuccess(tx);
-    }
-  };
-
-  // Helper to complete the transfer (deduct balance & record transaction)
-  const executeTransferSuccess = (txToExecute = pendingTxRef.current) => {
-    const tx = txToExecute || pendingTx;
-    if (!tx) return;
-
-    // Deduct balance
-    const newBalance = user.balance - Math.abs(tx.amount);
-    setUser(prev => ({ ...prev, balance: newBalance }));
-
-    // Add to transactions history
-    const completedTx = { ...tx, status: "completado" };
-    setTransactions(prev => [completedTx, ...prev]);
-
-    setCurrentScreen('VOUCHER');
   };
 
   // Start Biometric Scan from Fraud Alert screen
@@ -158,11 +227,37 @@ export default function App() {
     setIsBiometricScanOpen(true);
   };
 
-  // After 2-second Biometric Scan completes
-  const handleBiometricComplete = () => {
+  // After 2-second Biometric Scan completes -> Ejecutar en MySQL con force_approve = True
+  const handleBiometricComplete = async () => {
     setIsBiometricScanOpen(false);
-    // Verified successfully -> proceed to voucher!
-    executeTransferSuccess(pendingTxRef.current);
+    setIsEvaluating(true);
+
+    try {
+      const pending = pendingTxRef.current;
+      if (pending && pending.payloadForApproval) {
+        const backendRes = await ejecutarTransferenciaAPI(pending.payloadForApproval);
+        setIsEvaluating(false);
+
+        if (backendRes.success) {
+          const completedTx = backendRes.transaction;
+          pendingTxRef.current = completedTx;
+          setPendingTx(completedTx);
+          setUser(prev => ({ ...prev, balance: backendRes.sender_new_balance }));
+          setTransactions(prev => [completedTx, ...prev]);
+          setCurrentScreen('VOUCHER');
+          return;
+        } else {
+          alert(backendRes.error || 'No se pudo autorizar la transacción.');
+          setCurrentScreen('DASHBOARD');
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error en aprobación biométrica:', e);
+      setIsEvaluating(false);
+      alert('Error al procesar la biometría en el servidor.');
+      setCurrentScreen('DASHBOARD');
+    }
   };
 
   // Cancel and protect account
@@ -221,7 +316,9 @@ export default function App() {
       {currentScreen === 'VOUCHER' && (
         <VoucherScreen
           transaction={pendingTx}
+          user={user}
           onReturnHome={handleReturnHome}
+          onNewTransfer={() => setCurrentScreen('TRANSFER')}
         />
       )}
 

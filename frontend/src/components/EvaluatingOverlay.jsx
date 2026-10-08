@@ -18,30 +18,31 @@ export default function EvaluatingOverlay({ onFinished, currentRisk }) {
     }, 320);
 
     const timer = setTimeout(() => {
-      if (onFinishedRef.current) {
+      if (typeof onFinishedRef.current === 'function') {
         onFinishedRef.current();
       }
-    }, 1100);
+    }, 1200);
 
     return () => {
       clearInterval(stepInterval);
       clearTimeout(timer);
     };
-  }, []); // Run once on mount to guarantee completion!
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-      
-      {/* Radar Pulse Animation */}
-      <div className="relative w-28 h-28 flex items-center justify-center mb-6">
-        <div className="absolute inset-0 rounded-full bg-yape-600/30 animate-ping" />
-        <div className="absolute inset-2 rounded-full bg-mint/20 animate-pulse" />
-        <div className="absolute inset-4 rounded-full border-2 border-dashed border-mint/60 animate-spin" style={{ animationDuration: '6s' }} />
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+      <div className="bg-slate-900/90 border border-white/20 p-6 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-full">
         
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-yape-800 to-yape-600 flex items-center justify-center text-mint shadow-xl shadow-yape-700/50 relative z-10 border border-white/20">
-          <Cpu className="w-8 h-8 animate-bounce-soft" />
+        {/* Radar Pulse Animation */}
+        <div className="relative w-24 h-24 flex items-center justify-center mb-5">
+          <div className="absolute inset-0 rounded-full bg-yape-600/30 animate-ping" />
+          <div className="absolute inset-2 rounded-full bg-mint/20 animate-pulse" />
+          <div className="absolute inset-4 rounded-full border-2 border-dashed border-mint/60 animate-spin" style={{ animationDuration: '6s' }} />
+          
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-yape-800 to-yape-600 flex items-center justify-center text-mint shadow-xl shadow-yape-700/50 relative z-10 border border-white/20">
+            <Cpu className="w-7 h-7 animate-bounce-soft" />
+          </div>
         </div>
-      </div>
 
       {/* Title & Status */}
       <div className="space-y-2 max-w-xs">
@@ -75,5 +76,6 @@ export default function EvaluatingOverlay({ onFinished, currentRisk }) {
       </div>
 
     </div>
+  </div>
   );
 }

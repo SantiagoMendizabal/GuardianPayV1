@@ -52,3 +52,55 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* ==========================================================================
+   ESTILOS DE IMPRESIÓN Y EXPORTACIÓN PDF (GUARDIANPAY VOUCHER)
+   ========================================================================== */
+@media print {
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body, #root {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  nav, footer, .no-print, button, .print-hide, .no-print-area {
+    display: none !important;
+  }
+
+  .lg\:hidden {
+    display: none !important;
+  }
+
+  .hidden.lg\:flex, .hidden.lg\:block {
+    display: block !important;
+  }
+
+  .printable-voucher-card {
+    display: block !important;
+    width: 100% !important;
+    max-width: 620px !important;
+    margin: 10px auto !important;
+    padding: 24px !important;
+    border: 2px solid #742284 !important;
+    border-radius: 20px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+}
+

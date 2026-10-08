@@ -54,7 +54,7 @@ export default function ResponsiveLayout({
       {/* ========================================================================= */}
       {/* 2. VISTA ESCRITORIO (>= 1024px): Portal Banca por Internet (Estilo BCP)   */}
       {/* ========================================================================= */}
-      <div className="hidden lg:flex flex-col min-h-screen bg-[#f4f6f9] text-slate-900">
+      <div className="hidden lg:flex print:flex flex-col min-h-screen print:min-h-0 bg-[#f4f6f9] print:bg-white text-slate-900">
         
         {/* CASO A: PANTALLA LOGIN EN ESCRITORIO (Split-Screen como Imagen 1 de BCP) */}
         {currentScreen === 'LOGIN' ? (
@@ -156,7 +156,7 @@ export default function ResponsiveLayout({
           /* CASO B: PORTAL BANCARIO CON SESIÓN INICIADA (Estructura BCP como Imagen 2) */
           <>
             {/* 1. Barra de Navegación Superior Limpia Blanca (Navbar BCP) */}
-            <nav className="w-full bg-white text-slate-800 px-8 py-3.5 flex items-center justify-between border-b border-slate-200 shadow-xs z-20">
+            <nav className="w-full bg-white text-slate-800 px-8 py-3.5 flex items-center justify-between border-b border-slate-200 shadow-xs z-20 print:hidden">
               
               {/* Logo con el característico chevron bancario */}
               <div className="flex items-center gap-8">
@@ -218,7 +218,7 @@ export default function ResponsiveLayout({
             </nav>
 
             {/* 2. Hero Banner de Bienvenida (Solid Yape Purple estilo BCP en Imagen 2) */}
-            <div className="w-full bg-[#742284] text-white px-8 py-8 shadow-sm">
+            <div className="w-full bg-[#742284] text-white px-8 py-8 shadow-sm print:hidden">
               <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <div>
                   <div className="text-xs text-yape-200 mb-1 font-medium tracking-wide">
@@ -240,7 +240,7 @@ export default function ResponsiveLayout({
             </div>
 
             {/* 3. Contenedor Principal (Fondo Blanco/Gris Claro con separación limpia) */}
-            <main className="flex-1 max-w-7xl w-full mx-auto px-8 pt-8 pb-16">
+            <main className="flex-1 max-w-7xl w-full mx-auto px-8 pt-8 pb-16 print:p-0 print:m-0 print:max-w-none">
               
               {currentScreen === 'DASHBOARD' ? (
                 /* DASHBOARD ESTILO BCP: "¿Qué vamos a hacer hoy?" a la izquierda y "Mis productos" a la derecha */
@@ -448,8 +448,13 @@ export default function ResponsiveLayout({
                   </div>
 
                 </div>
+              ) : (currentScreen === 'TRANSFER' || currentScreen === 'VOUCHER') ? (
+                /* CASO TRANSFERENCIA Y VOUCHER EN ESCRITORIO: Layout Completo Nativo */
+                <div className="w-full">
+                  {children}
+                </div>
               ) : (
-                /* CASO FORMULARIO DE TRANSFERENCIA / VOUCHER / ALERTA EN ESCRITORIO */
+                /* CASO VOUCHER / ALERTA EN ESCRITORIO */
                 <div className="max-w-xl mx-auto bg-white rounded-3xl p-6 border border-slate-200 shadow-md relative">
                   <button
                     onClick={() => onNavigate('DASHBOARD')}
@@ -465,7 +470,7 @@ export default function ResponsiveLayout({
             </main>
 
             {/* 4. Footer Oficial Blanco / Claro */}
-            <footer className="w-full bg-white border-t border-slate-200 px-8 py-5 text-center text-xs text-slate-400 flex items-center justify-between">
+            <footer className="w-full bg-white border-t border-slate-200 px-8 py-5 text-center text-xs text-slate-400 flex items-center justify-between print:hidden">
               <span>GuardianPay © 2026 • Plataforma de Billetera Digital & Prevención de Fraudes</span>
               <span className="text-xs font-medium">Sistema de Validación Experimental con Machine Learning</span>
             </footer>

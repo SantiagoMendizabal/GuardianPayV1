@@ -33,3 +33,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Backups temporales con fecha
+backend/backup/backup_*.sql
+
