@@ -193,16 +193,10 @@ export function getApiBaseUrl() {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'http://127.0.0.1:8000';
-    }
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-      return `http://${host}:8000`;
-    }
-  }
-  return 'http://127.0.0.1:8000';
+  // Usar ruta relativa '' permite que el proxy de Vite en puerto 3000 reenvíe
+  // las peticiones hacia FastAPI (puerto 8000). Esto garantiza que el celular funcione
+  // en la red Wi-Fi sin bloqueo de CORS ni del Firewall de Windows.
+  return '';
 }
 
 const API_BASE_URL = getApiBaseUrl();

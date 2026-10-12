@@ -17,8 +17,14 @@ if not exist ".env" (
 
 echo [OK] Directorio: %CD%
 
-if exist "venv\Scripts\python.exe" goto use_venv
-goto use_global
+if not exist "venv\Scripts\python.exe" (
+    echo [INFO] No se encontro la carpeta venv.
+    echo [INFO] Creando entorno virtual e instalando librerias de Python...
+    python -m venv venv
+    venv\Scripts\python.exe -m pip install -r requirements.txt
+    echo [OK] Entorno virtual y librerias instaladas con exito.
+    echo.
+)
 
 :use_venv
 echo [INFO] Usando entorno virtual venv local

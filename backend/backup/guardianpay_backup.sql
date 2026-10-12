@@ -1,6 +1,6 @@
 -- =============================================================================
 -- RESPALDO DE BASE DE DATOS: guardianpay_db
--- FECHA DE GENERACIÓN: 2026-10-08 11:13:02
+-- FECHA DE GENERACIÓN: 2026-10-12 01:55:36
 -- SERVIDOR: localhost:3306 | USUARIO: root
 -- =============================================================================
 
@@ -28,14 +28,16 @@ CREATE TABLE `usuarios` (
   UNIQUE KEY `ix_users_phone` (`phone`),
   UNIQUE KEY `ix_users_dni` (`dni`),
   KEY `ix_users_id` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcado de datos para la tabla `usuarios` (5 registros)
-INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (1, '72849102', 'Anthony Luque', '987654321', '1999-08-24', 'anthony.luque@guardianpay.pe', 'pbkdf2:546d88d56d176edbe0702b541227a0de:88f5d73ba3c1877943b88c167f3fd6250542a70ba0bc79ec8e8ece750f224438', 755.0, '193-482910-0-21', 'AL', '2026-10-07 15:46:47');
-INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (2, '71982341', 'Lucía Gómez', '981234567', '2000-03-12', 'lucia.gomez@gmail.com', '123456', 1050.0, '193-774912-0-88', 'LG', '2026-10-07 15:46:47');
-INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (3, '70819234', 'Carlos Mendoza', '971889922', '1998-11-05', 'carlos.mendoza@gmail.com', 'pbkdf2:fe0a2791d170a9656794cebe7abcdd24:f94c7c7efe197b6887a8f428a063ad2c1a52f344eee22c6888f2533c28ea9cc8', 1005.0, '193-559102-0-34', 'CM', '2026-10-07 15:46:47');
+-- Volcado de datos para la tabla `usuarios` (7 registros)
+INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (1, '72849102', 'Anthony Luque', '987654321', '1999-08-24', 'anthony.luque@guardianpay.pe', 'pbkdf2:546d88d56d176edbe0702b541227a0de:88f5d73ba3c1877943b88c167f3fd6250542a70ba0bc79ec8e8ece750f224438', 2735.0, '193-482910-0-21', 'AL', '2026-10-07 15:46:47');
+INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (2, '71982341', 'Lucía Gómez', '981234567', '2000-03-12', 'lucia.gomez@gmail.com', '123456', 1110.0, '193-774912-0-88', 'LG', '2026-10-07 15:46:47');
+INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (3, '70819234', 'Carlos Mendoza', '971889922', '1998-11-05', 'carlos.mendoza@gmail.com', 'pbkdf2:fe0a2791d170a9656794cebe7abcdd24:f94c7c7efe197b6887a8f428a063ad2c1a52f344eee22c6888f2533c28ea9cc8', 1485.0, '193-559102-0-34', 'CM', '2026-10-07 15:46:47');
 INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (4, '73910284', 'Santiago Mendizabal', '993441122', '1999-01-18', 'santiago.m@guardianpay.pe', '123456', 2100.0, '193-882190-0-99', 'SM', '2026-10-07 15:46:47');
 INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (5, '40918273', 'María Quispe (Mamá)', '976543210', '1975-06-30', 'maria.quispe@gmail.com', '123456', 1200.0, '193-339182-0-12', 'MQ', '2026-10-07 15:46:47');
+INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (6, '40300678', 'Daniel', '111222333', '2000-01-15', '', 'pbkdf2:80ad99b1b696efc11e2d55a599f7703c:03d2312ceb454584bd64a5f4b248cb92fd04f0c087d719c3a79a87cb3d72c4a7', 1130.0, '193-808649-0-86', 'DA', '2026-10-12 06:40:52');
+INSERT INTO `usuarios` (`id`, `dni`, `name`, `phone`, `birth_date`, `email`, `pin`, `balance`, `account_number`, `avatar`, `created_at`) VALUES (7, '40506076', 'loco', '333444555', '2000-01-15', '', 'pbkdf2:8ede3cbb6ceaf12fc0160526d82e5d6b:55ca80b366d0db3cae58fe510c010ef5eb816be08b255431837f1fa7ccaa3ee4', 2000.0, '193-256206-0-84', 'LO', '2026-10-12 06:42:38');
 
 
 -- Estructura de tabla para `transferencias`
@@ -61,9 +63,9 @@ CREATE TABLE `transferencias` (
   KEY `ix_transactions_id` (`id`),
   CONSTRAINT `transferencias_ibfk_1` FOREIGN KEY (`sender_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `transferencias_ibfk_2` FOREIGN KEY (`receiver_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcado de datos para la tabla `transferencias` (12 registros)
+-- Volcado de datos para la tabla `transferencias` (21 registros)
 INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (1, 'OP-37721732', 1, 2, 50.0, '14:30', 'Arequipa', 0, 60.8, 'MEDIO', 'APROBADO_CON_ALERTA', 'COMPLETADO', '2026-10-07 15:52:12');
 INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (2, 'OP-14885052', 1, 2, 25.0, '14:30', 'Arequipa', 1, 1.2, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-07 15:53:08');
 INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (3, 'OP-19243231', 1, 2, 50.0, '14:30', 'Arequipa', 1, 1.0, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-07 16:04:00');
@@ -76,6 +78,15 @@ INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`
 INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (10, 'OP-84140948', 1, 3, 480.0, '14:30', 'Arequipa', 1, 78.4, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 'COMPLETADO', '2026-10-07 16:37:44');
 INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (11, 'OP-75178796', 3, 2, 30.0, '15:45', 'Arequipa', 1, 1.6, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-07 16:48:19');
 INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (12, 'OP-15544201', 1, 2, 5.0, '14:30', 'Arequipa', 1, 4.9, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-07 16:52:56');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (13, 'OP-80019567', 1, 2, 25.0, '14:30', 'Arequipa', 1, 3.2, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-11 17:09:04');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (14, 'OP-77251729', 1, 2, 10.0, '14:30', 'Arequipa', 1, 6.0, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-11 17:11:43');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (15, 'OP-13586051', 1, 2, 25.0, '14:30', 'Arequipa', 1, 8.8, 'BAJO', 'APROBADO', 'COMPLETADO', '2026-10-12 06:36:58');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (16, 'OP-79380583', 1, 3, 480.0, '03:45 AM', 'Inusual / IP Extranjera', 1, 55.0, 'MEDIO', 'APROBADO_CON_ALERTA', 'COMPLETADO', '2026-10-12 06:39:34');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (17, 'OP-16593236', 7, 1, 3000.0, '14:30', 'Arequipa', 0, 63.9, 'MEDIO', 'APROBADO_CON_ALERTA', 'COMPLETADO', '2026-10-12 06:42:55');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (18, 'OP-10999082', 1, 6, 480.0, '03:45 AM', 'Inusual / IP Extranjera', 0, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 'COMPLETADO', '2026-10-12 06:44:20');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (19, 'OP-31378353', 1, 6, 480.0, '03:45 AM', 'Inusual / IP Extranjera', 0, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 'COMPLETADO', '2026-10-12 06:44:20');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (20, 'OP-60259220', 1, 6, 480.0, '03:45 AM', 'Inusual / IP Extranjera', 0, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 'COMPLETADO', '2026-10-12 06:44:20');
+INSERT INTO `transferencias` (`id`, `operation_code`, `sender_id`, `receiver_id`, `amount`, `time_str`, `location_str`, `is_frequent_contact`, `risk_score`, `risk_level`, `decision`, `status`, `created_at`) VALUES (21, 'OP-98201468', 1, 6, 480.0, '03:45 AM', 'Inusual / IP Extranjera', 0, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 'COMPLETADO', '2026-10-12 06:44:20');
 
 
 -- Estructura de tabla para `auditoria_ia`
@@ -98,14 +109,24 @@ CREATE TABLE `auditoria_ia` (
   KEY `user_id` (`user_id`),
   KEY `ix_auditoria_ia_id` (`id`),
   CONSTRAINT `auditoria_ia_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcado de datos para la tabla `auditoria_ia` (5 registros)
+-- Volcado de datos para la tabla `auditoria_ia` (15 registros)
 INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (1, 1, 'OP-99056117', 20.0, '14:30', 0, 0, 0, 1.3, 'BAJO', 'APROBADO', 41.37, '2026-10-07 16:46:02');
 INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (2, 3, 'OP-11029384', 35.0, '10:15', 0, 0, 0, 2.1, 'BAJO', 'APROBADO', 38.2, '2026-10-07 16:46:02');
 INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (3, 1, 'OP-SIM-ALERT', 480.0, '03:45', 1, 1, 1, 78.3, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 83.46, '2026-10-07 16:46:02');
 INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (4, 3, 'OP-75178796', 30.0, '15:45', 0, 0, 0, 1.6, 'BAJO', 'APROBADO', 86.96, '2026-10-07 16:48:19');
 INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (5, 1, 'OP-15544201', 5.0, '14:30', 0, 0, 0, 4.9, 'BAJO', 'APROBADO', 44.79, '2026-10-07 16:52:56');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (6, 1, 'OP-80019567', 25.0, '14:30', 0, 0, 0, 3.2, 'BAJO', 'APROBADO', 71.95, '2026-10-11 17:09:04');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (7, 1, 'OP-77251729', 10.0, '14:30', 0, 0, 0, 6.0, 'BAJO', 'APROBADO', 43.31, '2026-10-11 17:11:43');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (8, 1, 'OP-13586051', 25.0, '14:30', 0, 0, 0, 8.8, 'BAJO', 'APROBADO', 91.06, '2026-10-12 06:36:58');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (9, 1, 'OP-79380583', 480.0, '03:45 AM', 1, 0, 1, 55.0, 'MEDIO', 'APROBADO_CON_ALERTA', 51.72, '2026-10-12 06:39:34');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (10, 7, 'OP-16593236', 3000.0, '14:30', 0, 1, 0, 63.9, 'MEDIO', 'APROBADO_CON_ALERTA', 40.72, '2026-10-12 06:42:55');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (11, 1, 'BLOQUEADO-BIOMETRIA', 480.0, '03:45 AM', 1, 1, 1, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 36.78, '2026-10-12 06:43:10');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (12, 1, 'OP-10999082', 480.0, '03:45 AM', 1, 1, 1, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 131.67, '2026-10-12 06:44:20');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (13, 1, 'OP-31378353', 480.0, '03:45 AM', 1, 1, 1, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 101.53, '2026-10-12 06:44:20');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (14, 1, 'OP-60259220', 480.0, '03:45 AM', 1, 1, 1, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 124.79, '2026-10-12 06:44:20');
+INSERT INTO `auditoria_ia` (`id`, `user_id`, `operation_code`, `monto_evaluado`, `hora_transaccion`, `es_madrugada`, `es_contacto_nuevo`, `es_ubicacion_inusual`, `score_obtenido`, `nivel_riesgo`, `decision_ia`, `tiempo_inferencia_ms`, `created_at`) VALUES (15, 1, 'OP-98201468', 480.0, '03:45 AM', 1, 1, 1, 70.9, 'CRÍTICO', 'DESAFIO_BIOMETRICO', 128.57, '2026-10-12 06:44:20');
 
 
 -- Estructura de tabla para `contactos_frecuentes`
@@ -124,16 +145,21 @@ CREATE TABLE `contactos_frecuentes` (
   KEY `ix_contactos_frecuentes_id` (`id`),
   CONSTRAINT `contactos_frecuentes_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `contactos_frecuentes_ibfk_2` FOREIGN KEY (`contact_user_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcado de datos para la tabla `contactos_frecuentes` (7 registros)
-INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (1, 1, 2, 'Lucía Amiga', 9, 1, '2026-10-07 16:52:56');
-INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (2, 1, 3, 'Carlos UTEC', 5, 1, '2026-10-07 16:46:02');
+-- Volcado de datos para la tabla `contactos_frecuentes` (12 registros)
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (1, 1, 2, 'Lucía Amiga', 12, 1, '2026-10-12 06:36:58');
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (2, 1, 3, 'Carlos UTEC', 6, 1, '2026-10-12 06:39:34');
 INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (3, 1, 5, 'Mamá', 14, 1, '2026-10-07 16:46:02');
 INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (4, 3, 1, 'Anthony Compañero', 4, 1, '2026-10-07 16:46:02');
 INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (5, 3, 2, 'Lucía Gómez', 3, 0, '2026-10-07 16:48:19');
 INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (6, 2, 1, 'Anthony Luque', 6, 1, '2026-10-07 16:46:02');
 INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (7, 2, 4, 'Santiago Profe', 3, 0, '2026-10-07 16:46:02');
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (8, 7, 1, 'Anthony Luque', 1, 0, '2026-10-12 06:42:55');
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (9, 1, 6, 'Daniel', 1, 0, '2026-10-12 06:44:20');
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (10, 1, 6, 'Daniel', 1, 0, '2026-10-12 06:44:20');
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (11, 1, 6, 'Daniel', 1, 0, '2026-10-12 06:44:20');
+INSERT INTO `contactos_frecuentes` (`id`, `user_id`, `contact_user_id`, `alias`, `contador_transferencias`, `es_favorito`, `updated_at`) VALUES (12, 1, 6, 'Daniel', 1, 0, '2026-10-12 06:44:20');
 
 
 SET FOREIGN_KEY_CHECKS = 1;
