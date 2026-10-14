@@ -2,7 +2,7 @@ import os
 import json
 import re
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Union, List, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Query
@@ -178,7 +178,11 @@ def compute_ai_risk(
     es_contacto: int,
     es_ubicacion: int,
     saldo_val: float = 1500.0,
-    intentos_val: int = 0
+    intentos_val: int = 0,
+    velocity_count_15m: int = 0,
+    impossible_travel: bool = False,
+    impossible_travel_detail: str = "",
+    monto_promedio_historico: float = 80.0
 ) -> PredictionResponse:
     start_time = datetime.now()
 
@@ -202,8 +206,29 @@ def compute_ai_risk(
 
     prob_array = rf_model.predict_proba(input_data)[0]
     prob_fraud = float(prob_array[1])
+    base_score = round(prob_fraud * 100, 1)
 
-    score = round(prob_fraud * 100, 1)
+    # -----------------------------------------------------------------------
+    # MEJORA SITUACIONAL EN TIEMPO REAL: Viaje Imposible + Velocity Burst
+    # -----------------------------------------------------------------------
+    score = base_score
+
+    # 1. Regla de Viaje Imposible (Detección de teletransportación geográfica / VPN)
+    if impossible_travel:
+        score = max(score, 88.5)
+
+    # 2. Regla de Frecuencia / Velocity Attack (Ataque de hormigueo en 15 min)
+    if velocity_count_15m >= 3:
+        score = max(score, 84.0)
+    elif velocity_count_15m == 2:
+        score = min(100.0, score + 28.0)
+
+    # 3. Desviación dinámica de gasto habitual (> 4.5 veces el promedio)
+    ratio_gasto = monto_val / max(monto_promedio_historico, 15.0)
+    if ratio_gasto >= 4.5 and monto_val > 180:
+        score = min(100.0, score + 22.0)
+
+    score = round(min(100.0, max(0.0, score)), 1)
     is_blocked = score >= 70.0
 
     if score >= 70.0:
@@ -224,6 +249,9 @@ def compute_ai_risk(
     contacto_imp = round(feature_importances_map.get("es_contacto_nuevo", 0.20) * 100, 1)
     ubicacion_imp = round(feature_importances_map.get("es_ubicacion_inusual", 0.15) * 100, 1)
 
+    # -----------------------------------------------------------------------
+    # EXPLICABILIDAD LOCAL POR TRANSACCIÓN (Desglose Dinámico de Factores)
+    # -----------------------------------------------------------------------
     factors = [
         FactorItem(
             id="base",
@@ -237,11 +265,29 @@ def compute_ai_risk(
         FactorItem(
             id="amount",
             name="Monto Elevado Inusual" if monto_val > 200 else "Monto en Rango Ordinario",
-            description=f"S/ {monto_val:.2f} excede el límite típico sin confirmación previa (> S/ 200.00)" if monto_val > 200 else f"S/ {monto_val:.2f} dentro del comportamiento habitual",
+            description=f"S/ {monto_val:.2f} es {ratio_gasto:.1f}x superior al promedio histórico (S/ {monto_promedio_historico:.2f})" if monto_val > 200 else f"S/ {monto_val:.2f} dentro del comportamiento financiero habitual",
             weight=monto_imp if monto_val > 200 else 0.0,
             applied=monto_val > 200,
             category="amount",
             severity="high" if monto_val > 200 else "low"
+        ),
+        FactorItem(
+            id="velocity",
+            name="Ráfaga de Frecuencia Inusual (Velocity Attack)" if velocity_count_15m >= 2 else "Frecuencia Transaccional Ordinaria",
+            description=f"Alerta: Se detectaron {velocity_count_15m + 1} transferencias en los últimos 15 min (Patrón sospechoso de hormigueo)" if velocity_count_15m >= 2 else "Intervalo de tiempo seguro entre transferencias",
+            weight=28.0 if velocity_count_15m >= 2 else 0.0,
+            applied=velocity_count_15m >= 2,
+            category="velocity",
+            severity="critical" if velocity_count_15m >= 3 else ("high" if velocity_count_15m == 2 else "low")
+        ),
+        FactorItem(
+            id="location",
+            name="Anomalía de Viaje Imposible (Impossible Travel)" if impossible_travel else ("Geolocalización Inusual / IP Remota" if es_ubicacion == 1 else "Geolocalización Habitual"),
+            description=impossible_travel_detail if impossible_travel else ("Conexión detectada fuera del nodo habitual o mediante proxy/VPN" if es_ubicacion == 1 else "Nodo de conexión coincide con el patrón de residencia habitual"),
+            weight=35.0 if impossible_travel else (ubicacion_imp if es_ubicacion == 1 else 0.0),
+            applied=impossible_travel or (es_ubicacion == 1),
+            category="location",
+            severity="critical" if impossible_travel else ("high" if es_ubicacion == 1 else "low")
         ),
         FactorItem(
             id="time",
@@ -260,15 +306,6 @@ def compute_ai_risk(
             applied=es_contacto == 1,
             category="contact",
             severity="medium" if es_contacto == 1 else "low"
-        ),
-        FactorItem(
-            id="location",
-            name="Geolocalización Inusual / IP Remota" if es_ubicacion == 1 else "Geolocalización Habitual",
-            description="Conexión detectada fuera del nodo habitual o mediante proxy/VPN" if es_ubicacion == 1 else "Nodo de conexión coincide con el patrón de residencia habitual",
-            weight=ubicacion_imp if es_ubicacion == 1 else 0.0,
-            applied=es_ubicacion == 1,
-            category="location",
-            severity="high" if es_ubicacion == 1 else "low"
         )
     ]
 
@@ -486,7 +523,54 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
             detail=f"Saldo insuficiente. Saldo disponible: S/ {sender.balance:.2f}"
         )
 
-    # 4. Consultar historial de transferencias y contactos frecuentes en MySQL
+    # 4. Consultar historial de transferencias, contactos frecuentes y variables de velocidad en MySQL
+    now_utc = datetime.utcnow()
+    fifteen_min_ago = now_utc - timedelta(minutes=15)
+
+    # 4.1 Frecuencia reciente en 15 min (Velocity Burst / Ataque Hormiga)
+    recent_15m_tx = db.query(Transaction).filter(
+        Transaction.sender_id == sender.id,
+        Transaction.created_at >= fifteen_min_ago,
+        Transaction.status == "COMPLETADO"
+    ).all()
+    velocity_count_15m = len(recent_15m_tx)
+
+    # 4.2 Promedio histórico de montos del usuario
+    all_past_tx = db.query(Transaction).filter(
+        Transaction.sender_id == sender.id,
+        Transaction.status == "COMPLETADO"
+    ).all()
+    avg_monto = (sum(t.amount for t in all_past_tx) / len(all_past_tx)) if all_past_tx else 80.0
+
+    # 4.3 Detección de "Viaje Imposible" (Impossible Travel Velocity)
+    last_tx = db.query(Transaction).filter(
+        Transaction.sender_id == sender.id,
+        Transaction.status == "COMPLETADO"
+    ).order_by(Transaction.id.desc()).first()
+
+    impossible_travel = False
+    travel_detail = ""
+    if last_tx and last_tx.location_str and last_tx.created_at:
+        min_elapsed = max(0.5, (now_utc - last_tx.created_at).total_seconds() / 60.0)
+        loc_prev = (last_tx.location_str or "").strip().lower()
+        loc_curr = (payload.location or "").strip().lower()
+
+        if loc_prev and loc_curr and loc_prev != loc_curr:
+            dist_map = {
+                ("arequipa", "lima"): 1010,
+                ("lima", "arequipa"): 1010,
+                ("arequipa", "ip extranjera"): 4500,
+                ("ip extranjera", "arequipa"): 4500,
+                ("lima", "ip extranjera"): 4500,
+                ("ip extranjera", "lima"): 4500
+            }
+            km = dist_map.get((loc_prev, loc_curr), 800)
+            # Si el cambio ocurrió en menos de 60 minutos, es físicamente imposible viajar esa distancia
+            if min_elapsed < 60:
+                impossible_travel = True
+                travel_detail = f"Transacción previa en {last_tx.location_str} hace {int(min_elapsed)} min y ahora en {payload.location} ({km} km). Velocidad físicamente imposible."
+
+    # 4.4 Contacto frecuente
     previous_transfers_count = db.query(Transaction).filter(
         Transaction.sender_id == sender.id,
         Transaction.receiver_id == recipient.id,
@@ -501,9 +585,9 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
     is_frequent = (previous_transfers_count >= 1) or (has_frequent_link is not None)
     hour_int = parse_hour(payload.hora)
     es_madrugada = 1 if (0 <= hour_int <= 5) else 0
-    es_ubicacion = 1 if ("Inusual" in payload.location or "Extranjera" in payload.location) else 0
+    es_ubicacion = 1 if ("Inusual" in payload.location or "Extranjera" in payload.location or impossible_travel) else 0
 
-    # 5. Evaluación matemática con Random Forest
+    # 5. Evaluación matemática con Random Forest + Reglas Situacionales (Velocity / Viaje Imposible)
     risk_eval = compute_ai_risk(
         monto_val=payload.amount,
         hour_int=hour_int,
@@ -511,7 +595,11 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
         es_contacto=0 if is_frequent else 1,
         es_ubicacion=es_ubicacion,
         saldo_val=sender.balance,
-        intentos_val=0
+        intentos_val=0,
+        velocity_count_15m=velocity_count_15m,
+        impossible_travel=impossible_travel,
+        impossible_travel_detail=travel_detail,
+        monto_promedio_historico=avg_monto
     )
 
     # 6. Intercepción por fraude si es crítico y no viene con validación biométrica forzada
