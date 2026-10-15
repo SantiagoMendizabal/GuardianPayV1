@@ -435,7 +435,8 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
     return {
         "success": True,
         "message": "Usuario registrado exitosamente.",
-        "user": new_user.to_dict()
+        "user": new_user.to_dict(),
+        "transactions": []
     }
 
 

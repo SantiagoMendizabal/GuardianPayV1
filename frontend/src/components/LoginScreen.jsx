@@ -129,7 +129,10 @@ export default function LoginScreen({ onLoginSuccess }) {
         setPhone(regPhone);
         setPin(regPin);
         setTimeout(() => {
-          onLoginSuccess(res.user);
+          onLoginSuccess({
+            ...res.user,
+            transactions: []
+          });
         }, 1200);
       } else {
         setErrorMsg(res.error || 'No se pudo completar el registro. Intente nuevamente.');

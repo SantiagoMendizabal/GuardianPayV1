@@ -51,18 +51,40 @@ export default function App() {
   // Login handler
   const handleLogin = (userData) => {
     setUser({
-      ...user,
-      ...userData,
-      balance: typeof userData.balance === 'number' ? userData.balance : user.balance
+      name: userData.name || "Usuario",
+      phone: userData.phone || "",
+      balance: typeof userData.balance === 'number' ? userData.balance : 500.0,
+      accountNumber: userData.accountNumber || userData.account_number || "193-000000-0-00",
+      avatar: userData.avatar || "GP",
+      id: userData.id
     });
-    if (userData.transactions && userData.transactions.length > 0) {
-      setTransactions(userData.transactions);
-    }
+    // Si la cuenta es nueva o no tiene transacciones, su historial debe ser una lista vacía []
+    setTransactions(Array.isArray(userData.transactions) ? userData.transactions : []);
+    // Reiniciar residuos de riesgo de sesiones pasadas a un baseline limpio
+    setRiskResult(null);
+    setPendingTx(null);
+    setLiveInputs({
+      monto: 25,
+      selectedTime: '14:30',
+      isFrequentContact: true,
+      selectedLocation: 'Arequipa'
+    });
     setCurrentScreen('DASHBOARD');
   };
 
   // Logout handler
   const handleLogout = () => {
+    // Limpieza total del estado de sesión en memoria
+    setUser(INITIAL_USER);
+    setTransactions([]);
+    setRiskResult(null);
+    setPendingTx(null);
+    setLiveInputs({
+      monto: 25,
+      selectedTime: '14:30',
+      isFrequentContact: true,
+      selectedLocation: 'Arequipa'
+    });
     setCurrentScreen('LOGIN');
   };
 
@@ -279,7 +301,13 @@ export default function App() {
       currentScreen={currentScreen}
       user={user}
       transactions={transactions}
-      onNavigate={(screen) => setCurrentScreen(screen)}
+      onNavigate={(screen) => {
+        if (screen === 'DASHBOARD') {
+          setRiskResult(null);
+          setPendingTx(null);
+        }
+        setCurrentScreen(screen);
+      }}
       onLogout={handleLogout}
       currentRisk={riskResult || currentInspectorRisk}
       liveInputs={liveInputs}
