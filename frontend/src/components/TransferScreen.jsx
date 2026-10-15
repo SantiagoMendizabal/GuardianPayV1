@@ -108,12 +108,17 @@ export default function TransferScreen({
     }
   }, [amount, selectedTime, isFrequentContact, selectedLocation, onInputChange]);
 
+  const userAvg = user?.avg_monto || 80.0;
+  const numAmount = parseFloat(amount) || 0;
+  const ratioGasto = userAvg > 0 ? (numAmount / userAvg) : 1.0;
+
   // Live Risk Calculation Preview
   const currentRisk = calcularRiesgoIA({
-    monto: parseFloat(amount) || 0,
+    monto: numAmount,
     hora: selectedTime,
     esContactoNuevo: !isFrequentContact,
-    esUbicacionInusual: selectedLocation !== 'Arequipa'
+    esUbicacionInusual: selectedLocation !== 'Arequipa',
+    userAvgMonto: userAvg
   });
 
   const handlePhoneChange = (e) => {
@@ -540,12 +545,30 @@ export default function TransferScreen({
             <div className="space-y-2">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Factores Ponderados:</div>
               <div className="space-y-1.5 text-xs">
-                <div className={`p-2 rounded-xl flex items-center justify-between border ${
-                  parseFloat(amount) > 200 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-600'
-                }`}>
-                  <span>Monto {parseFloat(amount) > 200 ? '> S/ 200.00 (Inusual)' : '<= S/ 200.00 (Ordinario)'}</span>
-                  <b className="font-mono">{parseFloat(amount) > 200 ? '+32.8%' : '0%'}</b>
-                </div>
+                {(() => {
+                  const af = currentRisk.factors?.find(f => f.id === 'amount');
+                  const isCrit = af?.severity === 'critical';
+                  const isHigh = af?.severity === 'high';
+                  const isMed = af?.severity === 'medium';
+                  const bgClass = isCrit 
+                    ? 'bg-red-50 border-red-200 text-red-900' 
+                    : isHigh 
+                      ? 'bg-amber-50 border-amber-200 text-amber-900' 
+                      : isMed 
+                        ? 'bg-amber-50/70 border-amber-100 text-amber-800' 
+                        : 'bg-slate-50 border-slate-100 text-slate-600';
+                  const weightStr = af && af.weight > 0 ? `+${af.weight.toFixed(1)}%` : '0%';
+                  const labelStr = af?.applied
+                    ? `${af.name} (${ratioGasto.toFixed(1)}x media S/ ${userAvg.toFixed(0)})`
+                    : `Monto Ordinario (<= S/ ${userAvg.toFixed(0)})`;
+
+                  return (
+                    <div className={`p-2 rounded-xl flex items-center justify-between border ${bgClass}`}>
+                      <span>{labelStr}</span>
+                      <b className="font-mono">{weightStr}</b>
+                    </div>
+                  );
+                })()}
                 <div className={`p-2 rounded-xl flex items-center justify-between border ${
                   selectedTime === '03:45 AM' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-50 border-slate-100 text-slate-600'
                 }`}>

@@ -40,11 +40,44 @@ export function calcularRiesgoIA({
   monto = 0,
   hora = "14:30",
   esContactoNuevo = false,
-  esUbicacionInusual = false
+  esUbicacionInusual = false,
+  userAvgMonto = 80.0
 }) {
   const numericAmount = parseFloat(monto) || 0;
   let score = 5; // Riesgo Base
-  
+  const avg = parseFloat(userAvgMonto) > 0 ? parseFloat(userAvgMonto) : 80.0;
+  const ratio = numericAmount / avg;
+
+  let amountWeight = 0;
+  let amountName = "Monto en Rango Ordinario";
+  let amountDesc = `S/ ${numericAmount.toFixed(2)} dentro del comportamiento habitual (promedio S/ ${avg.toFixed(0)})`;
+  let amountSeverity = "low";
+  let amountApplied = false;
+
+  // Escalonamiento dinámico de riesgo según la media del usuario y límites bancarios
+  if (ratio >= 4.5 || numericAmount >= 550) {
+    amountWeight = 50;
+    score += 50;
+    amountName = "Monto Crítico Anómalo";
+    amountDesc = `S/ ${numericAmount.toFixed(2)} es ${ratio.toFixed(1)}x superior a su promedio habitual (S/ ${avg.toFixed(0)})`;
+    amountSeverity = "critical";
+    amountApplied = true;
+  } else if (ratio >= 3.0 || numericAmount >= 350) {
+    amountWeight = 35;
+    score += 35;
+    amountName = "Monto Inusual";
+    amountDesc = `S/ ${numericAmount.toFixed(2)} supera ${ratio.toFixed(1)}x su promedio habitual (S/ ${avg.toFixed(0)})`;
+    amountSeverity = "high";
+    amountApplied = true;
+  } else if (ratio >= 1.8 || numericAmount > 200) {
+    amountWeight = 20;
+    score += 20;
+    amountName = "Monto Elevado";
+    amountDesc = `S/ ${numericAmount.toFixed(2)} está por encima de su promedio habitual (S/ ${avg.toFixed(0)})`;
+    amountSeverity = "medium";
+    amountApplied = true;
+  }
+
   const factors = [
     {
       id: "base",
@@ -53,33 +86,17 @@ export function calcularRiesgoIA({
       weight: 5,
       applied: true,
       category: "baseline"
+    },
+    {
+      id: "amount",
+      name: amountName,
+      description: amountDesc,
+      weight: amountWeight,
+      applied: amountApplied,
+      category: "amount",
+      severity: amountSeverity
     }
   ];
-
-  // 1. Regla de Monto (> S/ 200)
-  const isHighAmount = numericAmount > 200;
-  if (isHighAmount) {
-    score += 30;
-    factors.push({
-      id: "amount",
-      name: "Monto Elevado Inusual",
-      description: `S/ ${numericAmount.toFixed(2)} excede el límite típico sin confirmación previa (> S/ 200.00)`,
-      weight: 30,
-      applied: true,
-      category: "amount",
-      severity: "high"
-    });
-  } else {
-    factors.push({
-      id: "amount",
-      name: "Monto en Rango Ordinario",
-      description: `S/ ${numericAmount.toFixed(2)} dentro del comportamiento habitual (<= S/ 200.00)`,
-      weight: 0,
-      applied: false,
-      category: "amount",
-      severity: "low"
-    });
-  }
 
   // 2. Regla de Horario (Madrugada 00:00 - 05:00)
   const isNight = isMadrugada(hora);

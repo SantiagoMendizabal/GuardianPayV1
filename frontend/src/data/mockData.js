@@ -4,7 +4,8 @@ export const INITIAL_USER = {
   pin: "123456",
   balance: 1450.00,
   accountNumber: "8492-3021-9941",
-  avatar: "AL"
+  avatar: "AL",
+  avg_monto: 130.44
 };
 
 export const INITIAL_TRANSACTIONS = [

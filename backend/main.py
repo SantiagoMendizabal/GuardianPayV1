@@ -223,10 +223,14 @@ def compute_ai_risk(
     elif velocity_count_15m == 2:
         score = min(100.0, score + 28.0)
 
-    # 3. Desviación dinámica de gasto habitual (> 4.5 veces el promedio)
+    # 3. Desviación dinámica de gasto habitual según el perfil de cada usuario
     ratio_gasto = monto_val / max(monto_promedio_historico, 15.0)
-    if ratio_gasto >= 4.5 and monto_val > 180:
-        score = min(100.0, score + 22.0)
+    if ratio_gasto >= 4.5 or (monto_val >= 550 and ratio_gasto >= 3.5):
+        score = min(100.0, score + 35.0)
+    elif ratio_gasto >= 3.0 or monto_val >= 350:
+        score = min(100.0, score + 20.0)
+    elif ratio_gasto >= 1.8 or monto_val > 200:
+        score = min(100.0, score + 12.0)
 
     score = round(min(100.0, max(0.0, score)), 1)
     is_blocked = score >= 70.0
@@ -389,12 +393,22 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
         (Transaction.sender_id == user.id) | (Transaction.receiver_id == user.id)
     ).order_by(Transaction.id.desc()).limit(20).all()
 
+    # Calcular promedio histórico de envíos del usuario
+    all_sent = db.query(Transaction.amount).filter(
+        Transaction.sender_id == user.id,
+        Transaction.status == "COMPLETADO"
+    ).all()
+    user_avg = round(sum(t[0] for t in all_sent) / len(all_sent), 2) if all_sent else 80.0
+
     # Obtener contactos frecuentes del usuario
     contacts = db.query(ContactoFrecuente).filter(ContactoFrecuente.user_id == user.id).all()
 
+    user_dict = user.to_dict()
+    user_dict["avg_monto"] = user_avg
+
     return {
         "success": True,
-        "user": user.to_dict(),
+        "user": user_dict,
         "transactions": [t.to_dict(current_user_id=user.id) for t in txs],
         "frequent_contacts": [c.to_dict() for c in contacts]
     }
