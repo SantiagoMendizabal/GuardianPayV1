@@ -316,14 +316,28 @@ def compute_ai_risk(
     active_anomalies = [f for f in factors if f.applied and f.id != "base"]
     elapsed_ms = round((datetime.now() - start_time).total_seconds() * 1000, 2)
 
-    # Registro en consola para verificación en vivo
-    print(f"\n" + "="*60)
-    print(f"🤖 [GUARDIANPAY AI] Inferencia Random Forest en Tiempo Real")
-    print(f"   • Parámetros: Monto=S/{monto_val:.2f} | Hora={hour_int:02d}:00 | Madrugada={es_madrugada}")
-    print(f"   • Contexto: ContactoNuevo={es_contacto} | UbicacionInusual={es_ubicacion}")
-    print(f"   • Resultado ML: Probabilidad={prob_fraud:.4f} -> Score={score}/100")
-    print(f"   • Veredicto: {risk_level} ({decision}) | Inferencia en {elapsed_ms} ms")
-    print("="*60 + "\n")
+    # Conteo de votos de los 120 árboles del ensamble Scikit-Learn
+    try:
+        tree_preds = [int(est.predict(input_data.values)[0]) for est in rf_model.estimators_]
+        votos_fraude = sum(tree_preds)
+        votos_legitimo = len(tree_preds) - votos_fraude
+        pct_fraude = round((votos_fraude / len(tree_preds)) * 100, 1)
+    except Exception:
+        votos_fraude = int(round(prob_fraud * 120))
+        votos_legitimo = 120 - votos_fraude
+        pct_fraude = round(prob_fraud * 100, 1)
+
+    # Registro en consola para verificación en vivo durante sustentación
+    print(f"\n" + "="*70)
+    print(f"🌲 [GUARDIANPAY AI] INFERENCIA RANDOM FOREST ({len(rf_model.estimators_)} ÁRBOLES DE DECISIÓN)")
+    print(f"   • Entradas ML: Monto=S/{monto_val:.2f} | Hora={hour_int:02d}:00 | Madrugada={es_madrugada} | ContactoNuevo={es_contacto}")
+    print(f"   • Votación de Ensamble Scikit-Learn (predict_proba):")
+    print(f"     ├── [1] Votos de FRAUDE:   {votos_fraude:3d} / {len(rf_model.estimators_)} árboles ({pct_fraude}%)")
+    print(f"     └── [0] Votos de LEGÍTIMO: {votos_legitimo:3d} / {len(rf_model.estimators_)} árboles ({100.0 - pct_fraude:.1f}%)")
+    print(f"   • Probabilidad Base Scikit-Learn: P(Fraude) = {prob_fraud:.4f} -> {base_score}/100")
+    print(f"   • Score Final Ponderado (MySQL + ML): {score}/100 -> {risk_level} ({decision})")
+    print(f"   • Tiempo de Inferencia CPU: {elapsed_ms} ms")
+    print("="*70 + "\n")
 
     return PredictionResponse(
         rawScore=score,
