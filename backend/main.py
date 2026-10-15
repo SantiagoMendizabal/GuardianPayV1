@@ -476,8 +476,12 @@ def lookup_recipient(
                 ContactoFrecuente.user_id == sender.id,
                 ContactoFrecuente.contact_user_id == recipient.id
             ).first()
-            # Regla bancaria: frecuente si tiene >= 3 transferencias previas o enlace en agenda
-            is_frequent = (transfers_count >= 3) or (has_frequent_link is not None)
+            # Regla bancaria estricta: Se requiere mínimo 3 transferencias completadas o estar en favoritos explícitos
+            is_frequent = (transfers_count >= 3) or (
+                has_frequent_link is not None and (
+                    has_frequent_link.es_favorito or has_frequent_link.contador_transferencias >= 3
+                )
+            )
 
     return {
         "exists": True,
@@ -607,8 +611,12 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
         ContactoFrecuente.contact_user_id == recipient.id
     ).first()
 
-    # Buena práctica bancaria: Se requiere al menos 3 transferencias previas o enlace explícito
-    is_frequent = (previous_transfers_count >= 3) or (has_frequent_link is not None)
+    # Buena práctica bancaria: Se requiere al menos 3 transferencias previas o estar en favoritos explícitos
+    is_frequent = (previous_transfers_count >= 3) or (
+        has_frequent_link is not None and (
+            has_frequent_link.es_favorito or has_frequent_link.contador_transferencias >= 3
+        )
+    )
     hour_int = parse_hour(payload.hora)
     es_madrugada = 1 if (0 <= hour_int <= 5) else 0
     es_ubicacion = 1 if ("Inusual" in payload.location or "Extranjera" in payload.location or impossible_travel) else 0
