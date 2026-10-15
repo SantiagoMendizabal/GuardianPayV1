@@ -447,7 +447,8 @@ export async function iniciarSesionAPI(phone, pin) {
           phone: "987654321",
           balance: 1375.0,
           accountNumber: "193-482910-0-21",
-          avatar: "AL"
+          avatar: "AL",
+          avg_monto: 130.44
         },
         transactions: []
       };
