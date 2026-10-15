@@ -64,7 +64,7 @@ export default function TransferScreen({
       setIsLookingUp(true);
       setLookupError('');
 
-      buscarDestinatarioAPI(cleanPhone).then((res) => {
+      buscarDestinatarioAPI(cleanPhone, user?.phone).then((res) => {
         if (!isMounted) return;
         setIsLookingUp(false);
         if (res && res.exists) {
@@ -91,7 +91,10 @@ export default function TransferScreen({
     };
   }, [recipientPhone, user]);
 
-  const isFrequentContact = Boolean(recipientData);
+  // Si existe el titular, verificar si ya se tienen >= 3 transferencias o es frecuente; si no hay datos, verificar lista mock
+  const isFrequentContact = recipientData 
+    ? Boolean(recipientData.is_frequent) 
+    : FREQUENT_CONTACTS.some(c => c.phone === recipientPhone);
 
   // Sync with parent for live desktop telemetry
   useEffect(() => {
@@ -343,10 +346,16 @@ export default function TransferScreen({
                     isLookingUp
                       ? 'bg-slate-200 text-slate-700'
                       : recipientData
-                        ? 'bg-emerald-100 text-emerald-800'
+                        ? isFrequentContact
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
                         : 'bg-rose-100 text-rose-800'
                   }`}>
-                    {isLookingUp ? 'Buscando' : recipientData ? 'Verificado' : 'No Afiliado'}
+                    {isLookingUp 
+                      ? 'Buscando' 
+                      : recipientData 
+                        ? (isFrequentContact ? 'Verificado • Frecuente' : 'Verificado • Contacto Nuevo') 
+                        : 'No Afiliado'}
                   </span>
                 </div>
               )}

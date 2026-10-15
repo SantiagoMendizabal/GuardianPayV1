@@ -441,10 +441,15 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/users/lookup")
 @app.get("/api/v1/usuarios/lookup")
-def lookup_recipient(phone: str = Query(..., min_length=9, max_length=9), db: Session = Depends(get_db)):
+def lookup_recipient(
+    phone: str = Query(..., min_length=9, max_length=9),
+    sender_phone: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
     """
     Búsqueda en tiempo real del titular por número de teléfono (estilo Yape).
     Si no existe en la base de datos, impide la transferencia.
+    Calcula si es contacto frecuente con base en el historial (>= 3 transferencias o enlace explícito).
     """
     recipient = db.query(User).filter(User.phone == phone.strip()).first()
     if not recipient:
@@ -456,6 +461,24 @@ def lookup_recipient(phone: str = Query(..., min_length=9, max_length=9), db: Se
     # Enmascarar DNI para privacidad
     masked_dni = f"{recipient.dni[:2]}***{recipient.dni[-2:]}" if len(recipient.dni) == 8 else recipient.dni
 
+    # Evaluar historial de confianza con el emisor
+    transfers_count = 0
+    is_frequent = False
+    if sender_phone:
+        sender = db.query(User).filter(User.phone == sender_phone.strip()).first()
+        if sender and sender.id != recipient.id:
+            transfers_count = db.query(Transaction).filter(
+                Transaction.sender_id == sender.id,
+                Transaction.receiver_id == recipient.id,
+                Transaction.status == "COMPLETADO"
+            ).count()
+            has_frequent_link = db.query(ContactoFrecuente).filter(
+                ContactoFrecuente.user_id == sender.id,
+                ContactoFrecuente.contact_user_id == recipient.id
+            ).first()
+            # Regla bancaria: frecuente si tiene >= 3 transferencias previas o enlace en agenda
+            is_frequent = (transfers_count >= 3) or (has_frequent_link is not None)
+
     return {
         "exists": True,
         "user": {
@@ -463,7 +486,9 @@ def lookup_recipient(phone: str = Query(..., min_length=9, max_length=9), db: Se
             "name": recipient.name,
             "phone": recipient.phone,
             "dni": masked_dni,
-            "avatar": recipient.avatar
+            "avatar": recipient.avatar,
+            "is_frequent": is_frequent,
+            "transfers_count": transfers_count
         }
     }
 
@@ -582,7 +607,8 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
         ContactoFrecuente.contact_user_id == recipient.id
     ).first()
 
-    is_frequent = (previous_transfers_count >= 1) or (has_frequent_link is not None)
+    # Buena práctica bancaria: Se requiere al menos 3 transferencias previas o enlace explícito
+    is_frequent = (previous_transfers_count >= 3) or (has_frequent_link is not None)
     hour_int = parse_hour(payload.hora)
     es_madrugada = 1 if (0 <= hour_int <= 5) else 0
     es_ubicacion = 1 if ("Inusual" in payload.location or "Extranjera" in payload.location or impossible_travel) else 0

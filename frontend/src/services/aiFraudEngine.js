@@ -275,7 +275,7 @@ export async function evaluarFraudeAPI({
  * Búsqueda de destinatario en tiempo real (estilo Yape) contra la tabla 'usuarios' de MySQL
  * Endpoint: GET /api/v1/usuarios/lookup?phone={phone}
  */
-export async function buscarDestinatarioAPI(phone) {
+export async function buscarDestinatarioAPI(phone, senderPhone) {
   const cleanPhone = phone.replace(/\D/g, '').slice(0, 9);
   if (cleanPhone.length !== 9) {
     return { exists: false, message: 'El número debe tener 9 dígitos.' };
@@ -283,7 +283,10 @@ export async function buscarDestinatarioAPI(phone) {
 
   try {
     const res = await axios.get(`${API_BASE_URL}/api/v1/usuarios/lookup`, {
-      params: { phone: cleanPhone },
+      params: { 
+        phone: cleanPhone,
+        sender_phone: senderPhone || undefined
+      },
       timeout: 2500
     });
     return res.data;
@@ -291,11 +294,11 @@ export async function buscarDestinatarioAPI(phone) {
     console.warn('[GuardianPay] Error al consultar destinatario en backend MySQL:', error.message);
     // Fallback de demostración con contactos conocidos para no congelar la interfaz
     const mockDict = {
-      '981234567': { name: 'Lucía Gómez', dni: '71***41', avatar: 'LG' },
-      '971889922': { name: 'Carlos Mendoza', dni: '70***34', avatar: 'CM' },
-      '993441122': { name: 'Santiago Mendizabal', dni: '73***84', avatar: 'SM' },
-      '976543210': { name: 'María Quispe (Mamá)', dni: '40***73', avatar: 'MQ' },
-      '987654321': { name: 'Anthony Luque', dni: '72***02', avatar: 'AL' }
+      '981234567': { name: 'Lucía Gómez', dni: '71***41', avatar: 'LG', is_frequent: true, transfers_count: 5 },
+      '971889922': { name: 'Carlos Mendoza', dni: '70***34', avatar: 'CM', is_frequent: true, transfers_count: 4 },
+      '993441122': { name: 'Santiago Mendizabal', dni: '73***84', avatar: 'SM', is_frequent: true, transfers_count: 3 },
+      '976543210': { name: 'María Quispe (Mamá)', dni: '40***73', avatar: 'MQ', is_frequent: true, transfers_count: 12 },
+      '987654321': { name: 'Anthony Luque', dni: '72***02', avatar: 'AL', is_frequent: true, transfers_count: 6 }
     };
 
     if (mockDict[cleanPhone]) {
@@ -306,7 +309,9 @@ export async function buscarDestinatarioAPI(phone) {
           name: mockDict[cleanPhone].name,
           phone: cleanPhone,
           dni: mockDict[cleanPhone].dni,
-          avatar: mockDict[cleanPhone].avatar
+          avatar: mockDict[cleanPhone].avatar,
+          is_frequent: mockDict[cleanPhone].is_frequent,
+          transfers_count: mockDict[cleanPhone].transfers_count
         }
       };
     }
