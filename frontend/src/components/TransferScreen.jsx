@@ -108,7 +108,8 @@ export default function TransferScreen({
     }
   }, [amount, selectedTime, isFrequentContact, selectedLocation, onInputChange]);
 
-  const userAvg = user?.avg_monto || 80.0;
+  const fallbackUserAvg = user?.phone === '971889922' ? 30.0 : (user?.phone === '987654321' ? 118.04 : 80.0);
+  const userAvg = typeof user?.avg_monto === 'number' && user.avg_monto > 0 ? user.avg_monto : fallbackUserAvg;
   const numAmount = parseFloat(amount) || 0;
   const ratioGasto = userAvg > 0 ? (numAmount / userAvg) : 1.0;
 

@@ -45,18 +45,21 @@ export default function App() {
     monto: liveInputs.monto,
     hora: liveInputs.selectedTime,
     esContactoNuevo: !liveInputs.isFrequentContact,
-    esUbicacionInusual: liveInputs.selectedLocation !== 'Arequipa'
+    esUbicacionInusual: liveInputs.selectedLocation !== 'Arequipa',
+    userAvgMonto: user?.avg_monto || 80.0
   });
 
   // Login handler
   const handleLogin = (userData) => {
+    const fallbackAvg = userData.phone === '971889922' ? 30.0 : (userData.phone === '987654321' ? 118.04 : 80.0);
     setUser({
       name: userData.name || "Usuario",
       phone: userData.phone || "",
       balance: typeof userData.balance === 'number' ? userData.balance : 500.0,
       accountNumber: userData.accountNumber || userData.account_number || "193-000000-0-00",
       avatar: userData.avatar || "GP",
-      id: userData.id
+      id: userData.id,
+      avg_monto: typeof userData.avg_monto === 'number' ? userData.avg_monto : fallbackAvg
     });
     // Si la cuenta es nueva o no tiene transacciones, su historial debe ser una lista vacía []
     setTransactions(Array.isArray(userData.transactions) ? userData.transactions : []);

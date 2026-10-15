@@ -268,12 +268,12 @@ def compute_ai_risk(
         ),
         FactorItem(
             id="amount",
-            name="Monto Elevado Inusual" if monto_val > 200 else "Monto en Rango Ordinario",
-            description=f"S/ {monto_val:.2f} es {ratio_gasto:.1f}x superior al promedio histórico (S/ {monto_promedio_historico:.2f})" if monto_val > 200 else f"S/ {monto_val:.2f} dentro del comportamiento financiero habitual",
-            weight=monto_imp if monto_val > 200 else 0.0,
-            applied=monto_val > 200,
+            name="Monto Crítico Anómalo" if ratio_gasto >= 4.5 else ("Monto Inusual" if ratio_gasto >= 3.0 else ("Monto Elevado" if (monto_val > 200 or ratio_gasto >= 1.8) else "Monto en Rango Ordinario")),
+            description=f"S/ {monto_val:.2f} es {ratio_gasto:.1f}x superior al promedio habitual (S/ {monto_promedio_historico:.2f})" if (monto_val > 200 or ratio_gasto >= 1.8) else f"S/ {monto_val:.2f} dentro del comportamiento financiero habitual (promedio S/ {monto_promedio_historico:.2f})",
+            weight=35.0 if ratio_gasto >= 4.5 else (20.0 if ratio_gasto >= 3.0 else (monto_imp if (monto_val > 200 or ratio_gasto >= 1.8) else 0.0)),
+            applied=(monto_val > 200 or ratio_gasto >= 1.8),
             category="amount",
-            severity="high" if monto_val > 200 else "low"
+            severity="critical" if ratio_gasto >= 4.5 else ("high" if ratio_gasto >= 3.0 else ("medium" if (monto_val > 200 or ratio_gasto >= 1.8) else "low"))
         ),
         FactorItem(
             id="velocity",
