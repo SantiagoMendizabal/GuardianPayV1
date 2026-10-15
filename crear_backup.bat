@@ -1,5 +1,6 @@
 @echo off
 title GuardianPay - Generar Respaldo MySQL
+chcp 65001 >nul
 
 echo ===============================================================================
 echo             GUARDIANPAY - GENERADOR DE RESPALDO MYSQL 8.0
@@ -16,7 +17,9 @@ if exist "venv\Scripts\python.exe" (
 
 echo.
 echo ===============================================================================
-echo Respaldo finalizado en: backend\backup\guardianpay_backup.sql
+echo Respaldo actualizado exitosamente en:
+echo   - guardianpay_db.sql (Raiz del proyecto)
+echo   - backend\backup\guardianpay_backup.sql
 echo ===============================================================================
 echo.
 pause

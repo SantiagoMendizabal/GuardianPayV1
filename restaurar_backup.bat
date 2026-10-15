@@ -1,12 +1,16 @@
 @echo off
 title GuardianPay - Restaurar Base de Datos MySQL
+chcp 65001 >nul
 
 echo ===============================================================================
 echo            GUARDIANPAY - RESTAURAR BASE DE DATOS MYSQL 8.0
 echo ===============================================================================
 echo.
-echo Este proceso restaurara la base de datos 'guardianpay_db' con las 4 tablas
-echo oficiales y los datos de prueba de los 5 usuarios desde el backup.
+echo Este proceso importara la base de datos 'guardianpay_db' con:
+echo   - 11 Usuarios (Anthony Luque, Carlos Mendoza, Lucia Gomez, etc.)
+echo   - 53 Transacciones historicas con promedios reales
+echo   - 19 Contactos frecuentes
+echo   - 55 Registros de auditoria de inteligencia artificial
 echo.
 
 cd /d "%~dp0backend"
@@ -19,7 +23,7 @@ if exist "venv\Scripts\python.exe" (
 
 echo.
 echo ===============================================================================
-echo Proceso finalizado. Abre MySQL Workbench para verificar las tablas.
+echo Proceso finalizado. Puedes abrir MySQL Workbench para verificar las tablas.
 echo ===============================================================================
 echo.
 pause
