@@ -141,11 +141,24 @@ class RegisterRequest(BaseModel):
     birth_date: Optional[str] = Field("1999-05-15", description="Fecha de nacimiento AAAA-MM-DD")
     email: Optional[str] = Field(None, description="Correo electrónico")
     initial_balance: Optional[float] = Field(500.0, description="Saldo inicial promocional")
+    embedding: Optional[List[float]] = Field(None, description="Vector biométrico 128D si se enroló durante el registro")
 
 
 class LoginRequest(BaseModel):
     phone: str = Field(..., min_length=9, max_length=9, example="987654321")
     pin: str = Field("123456", min_length=6, max_length=6, example="123456")
+
+
+class EnrollBiometricsRequest(BaseModel):
+    phone: str = Field(..., min_length=9, max_length=9, description="Teléfono celular del titular", example="987654321")
+    embedding: List[float] = Field(..., description="Vector biométrico de 128 flotantes extraído por Google MediaPipe")
+    source: Optional[str] = Field("GOOGLE_MEDIAPIPE_3D", description="Fuente de captura")
+
+
+class VerifyBiometricsRequest(BaseModel):
+    phone: str = Field(..., min_length=9, max_length=9, description="Teléfono celular del emisor", example="987654321")
+    embedding: List[float] = Field(..., description="Vector facial extraído en vivo frente a la WebCam")
+    threshold: Optional[float] = Field(0.85, ge=0.50, le=0.99, description="Umbral mínimo de similitud del coseno (por defecto 85%)")
 
 
 class TransferExecutionRequest(BaseModel):
@@ -444,6 +457,7 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
     parts = payload.name.strip().split()
     avatar = (parts[0][0] + (parts[1][0] if len(parts) > 1 else parts[0][1])).upper()
 
+    has_face = bool(payload.embedding and len(payload.embedding) >= 64)
     new_user = User(
         dni=payload.dni,
         name=payload.name,
@@ -453,7 +467,10 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
         email=payload.email,
         balance=payload.initial_balance or 500.0,
         account_number=account_num,
-        avatar=avatar
+        avatar=avatar,
+        embedding_facial=json.dumps(payload.embedding) if has_face else None,
+        biometria_activa=has_face,
+        fecha_enrolamiento=datetime.utcnow() if has_face else None
     )
 
     db.add(new_user)
@@ -799,4 +816,139 @@ def get_user_contacts(phone: str, db: Session = Depends(get_db)):
     return {
         "user": user.name,
         "contacts": [c.to_dict() for c in contacts]
+    }
+
+
+# ---------------------------------------------------------------------------
+# Módulo de Ciberseguridad: Biometría Facial 3D y Embeddings (Google MediaPipe)
+# ---------------------------------------------------------------------------
+def compute_cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+    """
+    Calcula la Similitud del Coseno entre dos vectores biométricos.
+    Fórmula: cos(theta) = (A . B) / (||A||_2 * ||B||_2)
+    Retorna un valor acotado en el rango [0.0, 1.0].
+    """
+    try:
+        a = np.array(vec_a, dtype=np.float64)
+        b = np.array(vec_b, dtype=np.float64)
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
+        if norm_a == 0.0 or norm_b == 0.0:
+            return 0.0
+        cos_sim = np.dot(a, b) / (norm_a * norm_b)
+        return float(max(0.0, min(1.0, cos_sim)))
+    except Exception as e:
+        print(f"[WARN] Error al calcular similitud de coseno: {e}")
+        return 0.0
+
+
+@app.post("/api/v1/biometria/enrolar")
+@app.post("/api/v1/auth/enroll-face")
+def enroll_facial_biometrics(payload: EnrollBiometricsRequest, db: Session = Depends(get_db)):
+    """
+    Enrolamiento biométrico 1:1.
+    Almacena en MySQL el vector de 128 flotantes extraído por Google MediaPipe.
+    Cumple con la Ley 29733: No se almacena imagen gráfica, solo la firma vectorial irreversible.
+    """
+    user = db.query(User).filter(User.phone == payload.phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado en GuardianPay.")
+
+    if not payload.embedding or len(payload.embedding) < 64:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Vector biométrico inválido. Se requieren al menos 64 dimensiones (recibidas: {len(payload.embedding) if payload.embedding else 0})."
+        )
+
+    try:
+        # Serialización segura a JSON string
+        user.embedding_facial = json.dumps([round(float(x), 6) for x in payload.embedding])
+        user.biometria_activa = True
+        user.fecha_enrolamiento = datetime.utcnow()
+        db.commit()
+        db.refresh(user)
+
+        print(f"\n[BIOMETRÍA 3D] Rostro enrolado con éxito para: {user.name} ({user.phone})")
+        print(f"               Dimensiones almacenadas: {len(payload.embedding)} | Fuente: {payload.source}\n")
+
+        return {
+            "success": True,
+            "message": f"Biometría facial 3D enrolada exitosamente para {user.name}.",
+            "phone": user.phone,
+            "dimensions": len(payload.embedding),
+            "enrolled_at": user.fecha_enrolamiento.isoformat(),
+            "biometria_activa": True
+        }
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al persistir el vector biométrico: {str(err)}")
+
+
+@app.post("/api/v1/biometria/verificar")
+@app.post("/api/v1/auth/verify-face")
+def verify_facial_biometrics(payload: VerifyBiometricsRequest, db: Session = Depends(get_db)):
+    """
+    Verificación biométrica en vivo ante intercepción de fraude (Step-Up 2FA).
+    Compara el vector en vivo frente a la WebCam contra el vector enrolado en MySQL.
+    """
+    user = db.query(User).filter(User.phone == payload.phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if not user.embedding_facial or not user.biometria_activa:
+        raise HTTPException(
+            status_code=400,
+            detail="El usuario no tiene una biometría facial registrada. Debe realizar el enrolamiento primero."
+        )
+
+    try:
+        vector_guardado = json.loads(user.embedding_facial)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error de lectura del vector biométrico registrado en MySQL.")
+
+    # Cálculo matemático de Similitud del Coseno
+    similarity = compute_cosine_similarity(vector_guardado, payload.embedding)
+    threshold = float(payload.threshold or 0.85)
+    is_verified = bool(similarity >= threshold)
+
+    if similarity >= 0.93:
+        match_quality = "EXCELENTE"
+    elif similarity >= threshold:
+        match_quality = "ALTA_COINCIDENCIA"
+    elif similarity >= 0.70:
+        match_quality = "DUDOSA_BAJA"
+    else:
+        match_quality = "RECHAZADA_NO_COINCIDE"
+
+    print(f"\n[BIOMETRÍA 3D] Cotejo Facial para {user.name} ({user.phone}):")
+    print(f"               Similitud: {similarity * 100:.2f}% | Umbral: {threshold * 100:.2f}% | Veredicto: {'APROBADO' if is_verified else 'RECHAZADO'}")
+
+    return {
+        "success": True,
+        "verified": is_verified,
+        "similarity": round(similarity, 4),
+        "similarity_pct": round(similarity * 100, 2),
+        "threshold": round(threshold * 100, 2),
+        "match_quality": match_quality,
+        "message": "Identidad biométrica verificada exitosamente." if is_verified else "Rostro no coincide con el titular de la cuenta bancaria.",
+        "user_name": user.name,
+        "phone": user.phone
+    }
+
+
+@app.get("/api/v1/biometria/estado/{phone}")
+@app.get("/api/v1/auth/biometric-status/{phone}")
+def get_biometric_status(phone: str, db: Session = Depends(get_db)):
+    """Consulta el estado del registro biométrico de un usuario."""
+    user = db.query(User).filter(User.phone == phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    has_bio = bool(user.biometria_activa and user.embedding_facial)
+    return {
+        "phone": user.phone,
+        "name": user.name,
+        "has_biometrics": has_bio,
+        "biometria_activa": user.biometria_activa,
+        "enrolled_at": user.fecha_enrolamiento.isoformat() if user.fecha_enrolamiento else None
     }

@@ -11,7 +11,8 @@ import {
   ChevronRight, 
   Cpu, 
   LogOut,
-  Sparkles
+  Sparkles,
+  ScanFace
 } from 'lucide-react';
 
 export default function DashboardScreen({
@@ -20,7 +21,8 @@ export default function DashboardScreen({
   onNavigateTransfer,
   onLogout,
   isInspectorOpen,
-  onToggleInspector
+  onToggleInspector,
+  onOpenBiometricEnroll
 }) {
   // En Yape el saldo inicia oculto por defecto para mayor privacidad
   const [showBalance, setShowBalance] = useState(false);
@@ -90,7 +92,14 @@ export default function DashboardScreen({
               <ShieldCheck className="w-3.5 h-3.5 text-mint" />
               <span className="font-semibold">Protección Antifraude Activa</span>
             </div>
-            <span className="text-[10px] text-yape-200 font-mono">IA Local v3.4</span>
+            <button
+              type="button"
+              onClick={onOpenBiometricEnroll}
+              className="text-[10px] text-mint font-semibold bg-mint/15 hover:bg-mint/25 border border-mint/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <ScanFace className="w-3 h-3 text-mint" />
+              <span>{user?.hasBiometrics || user?.biometriaActiva ? "Face ID: Activo" : "Enrolar Face ID"}</span>
+            </button>
           </div>
         </div>
 

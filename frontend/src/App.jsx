@@ -7,6 +7,7 @@ import EvaluatingOverlay from './components/EvaluatingOverlay';
 import VoucherScreen from './components/VoucherScreen';
 import FraudAlertScreen from './components/FraudAlertScreen';
 import BiometricModal from './components/BiometricModal';
+import BiometricEnrollModal from './components/BiometricEnrollModal';
 import AiInspectorDrawer from './components/AiInspectorDrawer';
 import { INITIAL_USER, INITIAL_TRANSACTIONS } from './data/mockData';
 import { calcularRiesgoIA, evaluarFraudeAPI, ejecutarTransferenciaAPI } from './services/aiFraudEngine';
@@ -25,6 +26,7 @@ export default function App() {
   // Processing & Simulation Overlays
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isBiometricScanOpen, setIsBiometricScanOpen] = useState(false);
+  const [isEnrollOpen, setIsEnrollOpen] = useState(false);
 
   // Current Transaction Payload & AI Result
   const [pendingTx, setPendingTx] = useState(null);
@@ -330,6 +332,7 @@ export default function App() {
           onLogout={handleLogout}
           isInspectorOpen={isInspectorOpen}
           onToggleInspector={() => setIsInspectorOpen(!isInspectorOpen)}
+          onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
         />
       )}
 
@@ -371,9 +374,20 @@ export default function App() {
         />
       )}
 
+            {/* Biometric Enroll Modal (Google MediaPipe 3D) */}
+      {isEnrollOpen && (
+        <BiometricEnrollModal
+          user={user}
+          onClose={() => setIsEnrollOpen(false)}
+          onEnrolled={(res) => {
+            setUser(prev => ({ ...prev, hasBiometrics: true, biometriaActiva: true }));
+          }}
+        />
+      )}
+
       {/* Biometric Face Scan Modal (2s Simulation) */}
       {isBiometricScanOpen && (
-        <BiometricModal onComplete={handleBiometricComplete} />
+        <BiometricModal user={user} onComplete={handleBiometricComplete} onCancel={() => setIsBiometricScanOpen(false)} />
       )}
 
       {/* AI Inspector Drawer (Solo en móvil cuando se activa el toggle) */}

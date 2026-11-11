@@ -468,7 +468,8 @@ export async function registrarUsuarioAPI({
   pin,
   birthDate = "1998-05-15",
   email = "",
-  initialBalance = 500.0
+  initialBalance = 500.0,
+  embedding = null
 }) {
   try {
     const res = await axios.post(`${API_BASE_URL}/api/v1/auth/register`, {
@@ -478,7 +479,8 @@ export async function registrarUsuarioAPI({
       pin,
       birth_date: birthDate,
       email,
-      initial_balance: parseFloat(initialBalance) || 500.0
+      initial_balance: parseFloat(initialBalance) || 500.0,
+      embedding: embedding || null
     }, {
       timeout: 4000,
       headers: { 'Content-Type': 'application/json' }
@@ -495,3 +497,81 @@ export async function registrarUsuarioAPI({
   }
 }
 
+
+
+/**
+ * Enrolar vector biométrico 128D en MySQL para un usuario (POST /api/v1/biometria/enrolar)
+ */
+export async function enrolarBiometriaAPI(phone, embedding, source = "GOOGLE_MEDIAPIPE_3D") {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/api/v1/biometria/enrolar`, {
+      phone,
+      embedding,
+      source
+    }, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response && error.response.data) {
+      return {
+        success: false,
+        error: error.response.data.detail || 'Error al enrolar biometría en el servidor.'
+      };
+    }
+    return {
+      success: false,
+      error: 'Error de conexión con el servicio biométrico.'
+    };
+  }
+}
+
+/**
+ * Cotejo biométrico 1:1 en vivo frente a la WebCam (POST /api/v1/biometria/verificar)
+ */
+export async function verificarBiometriaAPI(phone, embedding, threshold = 0.85) {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/api/v1/biometria/verificar`, {
+      phone,
+      embedding,
+      threshold
+    }, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response && error.response.data) {
+      return {
+        success: false,
+        verified: false,
+        error: error.response.data.detail || 'Error al verificar biometría facial.'
+      };
+    }
+    return {
+      success: false,
+      verified: false,
+      error: 'No se pudo conectar con el motor biométrico del backend.'
+    };
+  }
+}
+
+/**
+ * Consulta de estado biométrico de un usuario (GET /api/v1/biometria/estado/{phone})
+ */
+export async function obtenerEstadoBiometriaAPI(phone) {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/v1/biometria/estado/${encodeURIComponent(phone)}`, {
+      timeout: 3000
+    });
+    return res.data;
+  } catch (error) {
+    return {
+      phone,
+      has_biometrics: false,
+      biometria_activa: false,
+      error: error.message
+    };
+  }
+}

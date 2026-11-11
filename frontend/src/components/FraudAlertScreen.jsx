@@ -98,7 +98,9 @@ export default function FraudAlertScreen({
             {activeAnomalies.length > 0 ? (
               activeAnomalies.map((factor) => (
                 <div key={factor.id} className="flex items-start gap-2 bg-red-950/40 border border-red-900/40 p-2 rounded-xl text-xs">
-                  <span className="text-red-400 font-bold font-mono mt-0.5">{factor.points || "+25%"}</span>
+                  <span className="text-red-400 font-bold font-mono mt-0.5">
+                    {factor.weight ? `+${factor.weight}%` : (factor.points || "+25%")}
+                  </span>
                   <div>
                     <div className="font-bold text-slate-200 text-[11px]">{factor.name}</div>
                     <div className="text-[10px] text-slate-400 leading-tight">{factor.description}</div>

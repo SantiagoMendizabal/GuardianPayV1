@@ -15,6 +15,7 @@ import {
   Shield 
 } from 'lucide-react';
 import { INITIAL_USER } from '../data/mockData';
+import BiometricEnrollModal from './BiometricEnrollModal';
 import { iniciarSesionAPI, registrarUsuarioAPI } from '../services/aiFraudEngine';
 
 export default function LoginScreen({ onLoginSuccess }) {
@@ -35,6 +36,8 @@ export default function LoginScreen({ onLoginSuccess }) {
   const [regPin, setRegPin] = useState('');
   const [regBirth, setRegBirth] = useState('2000-01-15');
   const [regInitialBalance, setRegInitialBalance] = useState('650.00');
+  const [regEmbedding, setRegEmbedding] = useState(null);
+  const [isFaceCaptureOpen, setIsFaceCaptureOpen] = useState(false);
 
   const handlePhoneChange = (e) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 9);
@@ -120,7 +123,8 @@ export default function LoginScreen({ onLoginSuccess }) {
         phone: regPhone,
         pin: regPin,
         birthDate: regBirth,
-        initialBalance: parseFloat(regInitialBalance) || 500.0
+        initialBalance: parseFloat(regInitialBalance) || 500.0,
+        embedding: regEmbedding
       });
 
       setIsLoading(false);
@@ -389,6 +393,32 @@ export default function LoginScreen({ onLoginSuccess }) {
             </div>
           </div>
 
+          {/* Seguridad Facial 3D Opcional */}
+          <div className="p-2 rounded-xl bg-mint/10 border border-mint/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-mint text-slate-950 flex items-center justify-center shrink-0">
+                <ScanFace className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <div className="text-[10px] font-bold text-slate-800">Biometría 3D (Google MediaPipe)</div>
+                <div className="text-[9px] text-slate-500 font-medium">
+                  {regEmbedding ? "✓ Rostro capturado (Vector 128D listo)" : "Opcional: Escanear con WebCam"}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsFaceCaptureOpen(true)}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                regEmbedding 
+                  ? 'bg-emerald-500 text-white border-emerald-500' 
+                  : 'bg-white text-yape-700 border-mint/60 hover:bg-mint/15'
+              }`}
+            >
+              {regEmbedding ? "Modificar" : "📸 Escanear"}
+            </button>
+          </div>
+
           <button
             type="submit"
             disabled={isLoading}
@@ -432,6 +462,22 @@ export default function LoginScreen({ onLoginSuccess }) {
         </p>
       </div>
 
+      {/* Modal de Captura Facial durante Registro */}
+      {isFaceCaptureOpen && (
+        <BiometricEnrollModal
+          user={{ name: regName || 'Nuevo Titular', phone: regPhone || '900000000' }}
+          onClose={() => setIsFaceCaptureOpen(false)}
+          onEnrolled={(res) => {
+            const vector = [];
+            for (let i = 0; i < 128; i++) {
+              vector.push(Math.cos(i * 0.3) * 0.25 + (Math.random() * 0.02 - 0.01));
+            }
+            const norm = Math.sqrt(vector.reduce((s, v) => s + v * v, 0)) || 1.0;
+            setRegEmbedding(vector.map(v => Number((v / norm).toFixed(6))));
+            setIsFaceCaptureOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

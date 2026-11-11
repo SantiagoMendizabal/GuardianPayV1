@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -16,6 +16,9 @@ class User(Base):
     balance = Column(Float, nullable=False, default=1500.0)
     account_number = Column(String(30), unique=True, nullable=False)
     avatar = Column(String(4), default="AL")
+    embedding_facial = Column(Text, nullable=True)  # Vector biométrico 128D serializado en JSON
+    biometria_activa = Column(Boolean, default=False, nullable=False)
+    fecha_enrolamiento = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relaciones de transacciones
@@ -33,7 +36,10 @@ class User(Base):
             "email": self.email,
             "balance": round(self.balance, 2),
             "accountNumber": self.account_number,
-            "avatar": self.avatar
+            "avatar": self.avatar,
+            "hasBiometrics": bool(self.biometria_activa and self.embedding_facial),
+            "biometriaActiva": bool(self.biometria_activa),
+            "fechaEnrolamiento": self.fecha_enrolamiento.isoformat() if self.fecha_enrolamiento else None
         }
 
 # Alias en español para el modelo

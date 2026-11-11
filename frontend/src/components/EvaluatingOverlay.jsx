@@ -9,7 +9,7 @@ export default function EvaluatingOverlay({ onFinished, currentRisk }) {
   const steps = [
     "Analizando telemetría del dispositivo...",
     "Correlacionando historial y patrones horarios...",
-    "Ejecutando modelo neuronal de fraude..."
+    "Ejecutando clasificador Random Forest..."
   ];
 
   useEffect(() => {
