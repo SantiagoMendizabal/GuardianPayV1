@@ -1,6 +1,6 @@
 {
   "model_name": "GuardianPay-RandomForest",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "features": [
     "monto",
     "hora",
@@ -11,6 +11,16 @@
     "intentos_fallidos"
   ],
   "threshold": 0.7,
-  "roc_auc_score": 0.8203,
-  "accuracy": 0.7153
+  "roc_auc_score": 0.8087,
+  "accuracy": 0.874,
+  "recall_fraude": 0.0323,
+  "balanceo": "SMOTE sampling_strategy=0.60 (solo train, dentro de CV)",
+  "n_estimators": 120,
+  "hiperparametros": {
+    "class_weight": null,
+    "max_depth": 8,
+    "min_samples_split": 2,
+    "n_estimators": 120
+  },
+  "sklearn_version": "1.9.1"
 }

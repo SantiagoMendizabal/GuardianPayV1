@@ -1,0 +1,16 @@
+{
+  "model_name": "GuardianPay-RandomForest",
+  "version": "2.0.0",
+  "features": [
+    "monto",
+    "hora",
+    "es_madrugada",
+    "es_contacto_nuevo",
+    "es_ubicacion_inusual",
+    "saldo_previo",
+    "intentos_fallidos"
+  ],
+  "threshold": 0.7,
+  "roc_auc_score": 0.8203,
+  "accuracy": 0.7153
+}
