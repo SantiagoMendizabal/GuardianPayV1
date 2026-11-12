@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="100%" height="100%" style="background:#ffffff; font-family: 'Segoe UI', Arial, sans-serif;">
+  <defs>
+    <!-- Shadow Filter -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.08" />
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#742284" />
+      <stop offset="100%" stop-color="#521d5b" />
+    </linearGradient>
+    <linearGradient id="mintGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D69E" />
+      <stop offset="100%" stop-color="#00b082" />
+    </linearGradient>
+
+    <!-- Arrow Marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#742284" />
+    </marker>
+    <marker id="arrowDark" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#334155" />
+    </marker>
+  </defs>
+
+  <!-- Title Header -->
+  <text x="60" y="55" font-size="28" font-weight="900" fill="#742284" letter-spacing="-0.5">GuardianPay Software Architecture</text>
+  <text x="60" y="80" font-size="13" font-weight="600" fill="#64748b">DIAGRAMA DE ARQUITECTURA DEL SISTEMA: CLIENTE – SERVIDOR CON MICROSERVICIO DE MACHINE LEARNING</text>
+
+  <!-- ========================================================================= -->
+  <!-- 1. CAPA DE PRESENTACIÓN (CLIENTE DUAL-LAYOUT) -->
+  <!-- ========================================================================= -->
+  <g transform="translate(60, 110)">
+    <!-- Container -->
+    <rect x="0" y="0" width="310" height="460" rx="24" fill="#faf5ff" stroke="#e9d5ff" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Header -->
+    <rect x="0" y="0" width="310" height="46" rx="24" fill="#742284" />
+    <rect x="0" y="24" width="310" height="22" fill="#742284" />
+    <text x="155" y="28" font-size="13" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">CAPA DE PRESENTACIÓN</text>
+    <text x="155" y="62" font-size="11" font-weight="700" fill="#742284" text-anchor="middle">«Single Page Application - React + Tailwind»</text>
+
+    <!-- Sub-box 1: Mobile App Yape -->
+    <g transform="translate(20, 80)">
+      <rect x="0" y="0" width="270" height="155" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+      <rect x="15" y="15" width="36" height="36" rx="10" fill="#742284" />
+      <!-- Smartphone Icon -->
+      <rect x="25" y="22" width="16" height="22" rx="3" fill="none" stroke="#00D69E" stroke-width="2" />
+      <circle cx="33" cy="40" r="1.5" fill="#00D69E" />
+      
+      <text x="62" y="30" font-size="14" font-weight="800" fill="#0f172a">Billetera Móvil</text>
+      <text x="62" y="45" font-size="11" font-weight="600" fill="#742284">Estilo App Yape (100dvh)</text>
+
+      <line x1="15" y1="62" x2="255" y2="62" stroke="#f1f5f9" stroke-width="1" />
+      <text x="15" y="82" font-size="11" fill="#475569">• Acceso mediante Celular y PIN 6 dígitos</text>
+      <text x="15" y="102" font-size="11" fill="#475569">• Saldo protegido oculto por defecto</text>
+      <text x="15" y="122" font-size="11" fill="#475569">• Formulario táctil de transferencias</text>
+      <text x="15" y="142" font-size="11" fill="#475569">• Comprobante oficial con IA Badge</text>
+    </g>
+
+    <!-- Sub-box 2: Web Portal BCP -->
+    <g transform="translate(20, 255)">
+      <rect x="0" y="0" width="270" height="175" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+      <rect x="15" y="15" width="36" height="36" rx="10" fill="#00D69E" />
+      <!-- Laptop / Monitor Icon -->
+      <rect x="23" y="22" width="20" height="14" rx="2" fill="none" stroke="#0f172a" stroke-width="2" />
+      <line x1="20" y1="39" x2="46" y2="39" stroke="#0f172a" stroke-width="2" />
+      
+      <text x="62" y="30" font-size="14" font-weight="800" fill="#0f172a">Banca por Internet</text>
+      <text x="62" y="45" font-size="11" font-weight="600" fill="#0f766e">Portal PC Estilo BCP</text>
+
+      <line x1="15" y1="62" x2="255" y2="62" stroke="#f1f5f9" stroke-width="1" />
+      <text x="15" y="82" font-size="11" fill="#475569">• Dashboard "¿Qué vamos a hacer hoy?"</text>
+      <text x="15" y="102" font-size="11" fill="#475569">• Tarjeta de ahorro con saldo enmascarado</text>
+      <text x="15" y="122" font-size="11" fill="#475569">• Historial: montos rojo (-) y verde (+)</text>
+      <text x="15" y="142" font-size="11" fill="#475569">• Widget de estado Random Forest v3.4</text>
+      <text x="15" y="162" font-size="11" fill="#475569">• Tipografía amigable y no robótica</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- 2. CAPA DE SEGURIDAD Y COMUNICACIÓN (API GATEWAY) -->
+  <!-- ========================================================================= -->
+  <g transform="translate(440, 150)">
+    <!-- Container -->
+    <rect x="0" y="0" width="280" height="380" rx="24" fill="#ffffff" stroke="#742284" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Top Badge -->
+    <rect x="0" y="0" width="280" height="46" rx="24" fill="url(#purpleGrad)" />
+    <rect x="0" y="24" width="280" height="22" fill="url(#purpleGrad)" />
+    <text x="140" y="28" font-size="13" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">API REST / GATEWAY</text>
+    <text x="140" y="62" font-size="11" font-weight="700" fill="#742284" text-anchor="middle">«FastAPI Framework - Python 3.11»</text>
+
+    <!-- Security & Endpoints Content -->
+    <g transform="translate(20, 80)">
+      <rect x="0" y="0" width="240" height="75" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+      <text x="15" y="24" font-size="12" font-weight="800" fill="#0f172a">POST /api/v1/predict-fraud</text>
+      <text x="15" y="44" font-size="10.5" fill="#64748b">Carga útil: {monto, hora, contacto,</text>
+      <text x="15" y="60" font-size="10.5" fill="#64748b">ubicacion_ip, celular_origen}</text>
+    </g>
+
+    <g transform="translate(20, 168)">
+      <rect x="0" y="0" width="240" height="55" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+      <text x="15" y="24" font-size="12" font-weight="800" fill="#0f172a">GET /api/v1/health</text>
+      <text x="15" y="44" font-size="10.5" fill="#64748b">Estado y telemetría del servicio</text>
+    </g>
+
+    <g transform="translate(20, 235)">
+      <rect x="0" y="0" width="240" height="115" rx="12" fill="#f5f3ff" stroke="#ddd6fe" />
+      <text x="15" y="24" font-size="12" font-weight="800" fill="#5b21b6">Protocolos de Seguridad:</text>
+      <text x="15" y="46" font-size="11" fill="#475569">🔒 Cifrado de extremo a extremo</text>
+      <text x="15" y="66" font-size="11" fill="#475569">🛡️ Seguridad bancaria TLS 1.3</text>
+      <text x="15" y="86" font-size="11" fill="#475569">⚡ Latencia de respuesta &lt; 50 ms</text>
+      <text x="15" y="106" font-size="11" fill="#475569">📑 Serialización JSON asíncrona</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- 3. CAPA DE MACHINE LEARNING & BIOMETRÍA -->
+  <!-- ========================================================================= -->
+  <g transform="translate(790, 110)">
+    <!-- Container -->
+    <rect x="0" y="0" width="350" height="460" rx="24" fill="#f0fdf4" stroke="#86efac" stroke-width="2" filter="url(#cardShadow)" />
+    
+    <!-- Header -->
+    <rect x="0" y="0" width="350" height="46" rx="24" fill="#059669" />
+    <rect x="0" y="24" width="350" height="22" fill="#059669" />
+    <text x="175" y="28" font-size="13" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">CAPA DE MACHINE LEARNING</text>
+    <text x="175" y="62" font-size="11" font-weight="700" fill="#065f46" text-anchor="middle">«Detección Predictiva &amp; Contingencia Biométrica»</text>
+
+    <!-- Sub-box 1: Pandas Data Pipeline -->
+    <g transform="translate(20, 80)">
+      <rect x="0" y="0" width="310" height="95" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+      <text x="15" y="25" font-size="13" font-weight="800" fill="#0f172a">1. Pipeline de Datos (Pandas)</text>
+      <text x="15" y="45" font-size="11" fill="#475569">• Ingesta y normalización del vector transaccional</text>
+      <text x="15" y="65" font-size="11" fill="#475569">• Feature Engineering: ratio de monto y franja nocturna</text>
+      <text x="15" y="85" font-size="11" fill="#475569">• Codificación One-Hot de nodos de ubicación/IP</text>
+    </g>
+
+    <!-- Sub-box 2: Random Forest Model -->
+    <g transform="translate(20, 185)">
+      <rect x="0" y="0" width="310" height="120" rx="14" fill="#ffffff" stroke="#742284" stroke-width="2" />
+      <rect x="15" y="12" width="280" height="24" rx="6" fill="#f3e8ff" />
+      <text x="155" y="28" font-size="11.5" font-weight="800" fill="#742284" text-anchor="middle">MODELO CLASIFICADOR: RANDOM FOREST</text>
+      
+      <text x="15" y="55" font-size="11" fill="#0f172a">🌲 Archivo serializado: <b>model_randomforest.pkl</b></text>
+      <text x="15" y="73" font-size="11" fill="#0f172a">📊 Métrica de evaluación: <b>ROC-AUC &ge; 0.92</b></text>
+      <text x="15" y="91" font-size="11" fill="#0f172a">⚡ Inferencia predictiva: <b>predict_proba() en &lt; 20 ms</b></text>
+      <text x="15" y="109" font-size="11" font-weight="700" fill="#dc2626">⛔ Umbral crítico de intercepción: Riesgo &ge; 70%</text>
+    </g>
+
+    <!-- Sub-box 3: Biometrics Module -->
+    <g transform="translate(20, 315)">
+      <rect x="0" y="0" width="310" height="125" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+      <text x="15" y="24" font-size="13" font-weight="800" fill="#0f172a">2. Contingencia Biométrica Facial 3D</text>
+      <text x="15" y="44" font-size="11" fill="#475569">• Doble factor de autenticación ante operaciones bloqueadas</text>
+      <text x="15" y="64" font-size="11" fill="#475569">• Verificación de prueba de vida (Liveness Detection)</text>
+      <text x="15" y="84" font-size="11" fill="#475569">• Umbral de coincidencia biométrica: Match &ge; 99.8%</text>
+      <text x="15" y="104" font-size="11" font-weight="700" fill="#059669">✅ Desbloqueo y emisión de Voucher tras validación</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- CONNECTING ARROWS -->
+  <!-- ========================================================================= -->
+  <!-- From Presentation to API Gateway -->
+  <path d="M 370 280 L 436 280" stroke="#742284" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+  <path d="M 440 320 L 374 320" stroke="#334155" stroke-width="2.5" stroke-dasharray="5,5" fill="none" marker-end="url(#arrowDark)" />
+  
+  <rect x="375" y="260" width="55" height="16" rx="4" fill="#ffffff" stroke="#742284" stroke-width="1" />
+  <text x="402" y="272" font-size="9" font-weight="800" fill="#742284" text-anchor="middle">HTTPS</text>
+
+  <rect x="375" y="325" width="55" height="16" rx="4" fill="#ffffff" stroke="#334155" stroke-width="1" />
+  <text x="402" y="337" font-size="9" font-weight="700" fill="#334155" text-anchor="middle">JSON</text>
+
+  <!-- From API Gateway to Machine Learning -->
+  <path d="M 720 280 L 786 280" stroke="#742284" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+  <path d="M 790 320 L 724 320" stroke="#334155" stroke-width="2.5" stroke-dasharray="5,5" fill="none" marker-end="url(#arrowDark)" />
+
+  <rect x="725" y="260" width="55" height="16" rx="4" fill="#ffffff" stroke="#742284" stroke-width="1" />
+  <text x="752" y="272" font-size="9" font-weight="800" fill="#742284" text-anchor="middle">FEATURES</text>
+
+  <rect x="725" y="325" width="55" height="16" rx="4" fill="#ffffff" stroke="#334155" stroke-width="1" />
+  <text x="752" y="337" font-size="9" font-weight="700" fill="#334155" text-anchor="middle">SCORE %</text>
+
+  <!-- Bottom Legend -->
+  <g transform="translate(60, 610)">
+    <text x="0" y="15" font-size="11" font-weight="800" fill="#334155">LEYENDA:</text>
+    <line x1="65" y1="11" x2="105" y2="11" stroke="#742284" stroke-width="2.5" marker-end="url(#arrow)" />
+    <text x="115" y="15" font-size="11" fill="#64748b">Flujo de petición transaccional</text>
+
+    <line x1="310" y1="11" x2="350" y2="11" stroke="#334155" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrowDark)" />
+    <text x="360" y="15" font-size="11" fill="#64748b">Respuesta predictiva y scoring</text>
+
+    <circle cx="580" cy="11" r="5" fill="#742284" />
+    <text x="592" y="15" font-size="11" fill="#64748b">Colores Corporativos: Púrpura #742284 (Yape) y Verde #00D69E</text>
+  </g>
+</svg>

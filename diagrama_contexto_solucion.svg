@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 550" width="100%" height="100%" style="background:#ffffff; font-family: 'Segoe UI', Arial, sans-serif;">
+  <defs>
+    <!-- Filter Shadow -->
+    <filter id="boxShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08" />
+    </filter>
+
+    <!-- Arrow Markers -->
+    <marker id="arrowHead" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#334155" />
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#742284" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="475" y="40" font-size="18" font-weight="900" fill="#742284" text-anchor="middle" letter-spacing="-0.3">DIAGRAMA DE CONTEXTO DE LA SOLUCIÓN (DFD NIVEL 0)</text>
+  <text x="475" y="60" font-size="11.5" font-weight="600" fill="#64748b" text-anchor="middle">Plataforma GuardianPay: Billetera Digital &amp; Detección Predictiva de Fraudes con Machine Learning</text>
+
+  <!-- ========================================================================= -->
+  <!-- CENTRAL CIRCLE: SISTEMA GUARDIANPAY -->
+  <!-- ========================================================================= -->
+  <circle cx="475" cy="275" r="75" fill="#f5f3ff" stroke="#742284" stroke-width="3" filter="url(#boxShadow)" />
+  <text x="475" y="265" font-size="16" font-weight="900" fill="#742284" text-anchor="middle">GuardianPay</text>
+  <text x="475" y="283" font-size="10.5" font-weight="700" fill="#00D69E" text-anchor="middle">(Sistema Central)</text>
+  <text x="475" y="298" font-size="9" fill="#64748b" text-anchor="middle">Billetera Móvil &amp; Web</text>
+
+  <!-- ========================================================================= -->
+  <!-- ENTIDAD 1: USUARIO / TITULAR (Izquierda Arriba) -->
+  <!-- ========================================================================= -->
+  <g transform="translate(60, 100)">
+    <rect x="0" y="0" width="190" height="70" rx="6" fill="#ffffff" stroke="#334155" stroke-width="1.8" filter="url(#boxShadow)" />
+    <text x="95" y="40" font-size="13" font-weight="800" fill="#0f172a" text-anchor="middle">Usuario (Titular)</text>
+    <!-- Label above -->
+    <text x="0" y="-8" font-size="10" fill="#64748b">• Credenciales (Celular, PIN 6 dígitos)</text>
+    <text x="0" y="-22" font-size="10" fill="#64748b">• Datos de transferencia (Monto, Destinatario)</text>
+  </g>
+
+  <!-- Flechas Usuario <-> GuardianPay -->
+  <!-- Usuario a Sistema -->
+  <path d="M 250 125 L 415 230" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="310" y="165" font-size="9.5" fill="#334155" font-weight="600" transform="rotate(32, 310, 165)">Orden de transferencia / PIN</text>
+
+  <!-- Sistema a Usuario -->
+  <path d="M 405 255 L 250 155" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="340" y="220" font-size="9.5" fill="#742284" font-weight="700" transform="rotate(32, 340, 220)">Comprobante / Alerta de Fraude</text>
+
+  <!-- ========================================================================= -->
+  <!-- ENTIDAD 2: ADMINISTRADOR / AUDITOR DE SEGURIDAD (Izquierda Abajo) -->
+  <!-- ========================================================================= -->
+  <g transform="translate(60, 390)">
+    <rect x="0" y="0" width="190" height="70" rx="6" fill="#ffffff" stroke="#334155" stroke-width="1.8" filter="url(#boxShadow)" />
+    <text x="95" y="40" font-size="13" font-weight="800" fill="#0f172a" text-anchor="middle">Auditor de Seguridad</text>
+  </g>
+
+  <!-- Flechas Administrador <-> GuardianPay -->
+  <!-- Sistema a Admin -->
+  <path d="M 420 315 L 250 405" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="320" y="345" font-size="9.5" fill="#334155" font-weight="600" transform="rotate(-28, 320, 345)">Logs de auditoría y métricas</text>
+
+  <!-- Admin a Sistema -->
+  <path d="M 250 435 L 410 340" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="320" y="405" font-size="9.5" fill="#334155" font-weight="600" transform="rotate(-28, 320, 405)">Calibración de umbrales de riesgo</text>
+
+  <!-- ========================================================================= -->
+  <!-- ENTIDAD 3: MICROSERVICIO DE MACHINE LEARNING (Derecha Arriba) -->
+  <!-- ========================================================================= -->
+  <g transform="translate(690, 100)">
+    <rect x="0" y="0" width="200" height="75" rx="6" fill="#ffffff" stroke="#742284" stroke-width="2" filter="url(#boxShadow)" />
+    <text x="100" y="34" font-size="12.5" font-weight="800" fill="#742284" text-anchor="middle">Microservicio de IA</text>
+    <text x="100" y="52" font-size="11" font-weight="700" fill="#00D69E" text-anchor="middle">(Random Forest Classifier)</text>
+    <!-- Label above -->
+    <text x="0" y="-8" font-size="10" fill="#64748b">• Modelo predictivo: model.pkl</text>
+    <text x="0" y="-22" font-size="10" fill="#64748b">• Preprocesamiento de datos (Pandas)</text>
+  </g>
+
+  <!-- Flechas GuardianPay <-> Microservicio IA -->
+  <!-- Sistema a Microservicio IA -->
+  <path d="M 535 230 L 690 125" stroke="#742284" stroke-width="1.8" fill="none" marker-end="url(#arrowPurple)" />
+  <text x="590" y="160" font-size="9.5" fill="#742284" font-weight="700" transform="rotate(-34, 590, 160)">Vector de características (monto, hora, IP)</text>
+
+  <!-- Microservicio IA a Sistema -->
+  <path d="M 690 155 L 545 255" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="615" y="215" font-size="9.5" fill="#334155" font-weight="600" transform="rotate(-34, 615, 215)">Puntaje de riesgo % y anomalías</text>
+
+  <!-- ========================================================================= -->
+  <!-- ENTIDAD 4: MÓDULO DE VERIFICACIÓN BIOMÉTRICA (Derecha Abajo) -->
+  <!-- ========================================================================= -->
+  <g transform="translate(690, 390)">
+    <rect x="0" y="0" width="200" height="70" rx="6" fill="#ffffff" stroke="#334155" stroke-width="1.8" filter="url(#boxShadow)" />
+    <text x="100" y="32" font-size="12" font-weight="800" fill="#0f172a" text-anchor="middle">Sensor Biométrico</text>
+    <text x="100" y="50" font-size="10.5" font-weight="600" fill="#059669" text-anchor="middle">(Reconocimiento Facial 3D)</text>
+  </g>
+
+  <!-- Flechas GuardianPay <-> Sensor Biométrico -->
+  <!-- Sistema a Sensor -->
+  <path d="M 535 320 L 690 410" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="600" y="350" font-size="9.5" fill="#dc2626" font-weight="700" transform="rotate(30, 600, 350)">Solicitud de validación (Score &ge; 70%)</text>
+
+  <!-- Sensor a Sistema -->
+  <path d="M 690 435 L 530 340" stroke="#334155" stroke-width="1.5" fill="none" marker-end="url(#arrowHead)" />
+  <text x="590" y="410" font-size="9.5" fill="#059669" font-weight="700" transform="rotate(30, 590, 410)">Coincidencia facial y prueba de vida</text>
+
+  <!-- Footer Caption -->
+  <text x="475" y="525" font-size="10.5" font-style="italic" fill="#475569" text-anchor="middle">
+    Ilustración 10. Modelo de arquitectura y contexto de la solución del proyecto.
+  </text>
+</svg>
