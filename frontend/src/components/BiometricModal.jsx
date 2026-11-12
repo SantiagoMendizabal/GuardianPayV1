@@ -19,7 +19,8 @@ import { verificarBiometriaAPI } from '../services/aiFraudEngine';
 export default function BiometricModal({ 
   user, 
   onComplete, 
-  onCancel 
+  onCancel,
+  onOpenEnroll
 }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
@@ -463,6 +464,18 @@ export default function BiometricModal({
         <p className="text-[9px] text-slate-500 font-mono text-center">
           Embeddings 128D • Similitud Coseno &ge; 85% • Ley 29733 SBS
         </p>
+
+        {onOpenEnroll && (
+          <div className="pt-1 text-center">
+            <button
+              type="button"
+              onClick={onOpenEnroll}
+              className="text-[10px] text-mint hover:underline font-semibold cursor-pointer"
+            >
+              ¿Deseas enrolar / registrar un rostro nuevo con la WebCam? Clic aquí
+            </button>
+          </div>
+        )}
       </div>
 
     </div>

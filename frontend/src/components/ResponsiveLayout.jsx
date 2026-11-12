@@ -26,7 +26,8 @@ import {
   Sparkles,
   ArrowLeft,
   Settings,
-  BarChart3
+  BarChart3,
+  ScanFace
 } from 'lucide-react';
 
 export default function ResponsiveLayout({
@@ -38,6 +39,7 @@ export default function ResponsiveLayout({
   currentRisk,
   liveInputs,
   onUpdateInput,
+  onOpenBiometricEnroll,
   children
 }) {
   const [showDesktopBalance, setShowDesktopBalance] = useState(false);
@@ -207,7 +209,19 @@ export default function ResponsiveLayout({
               </div>
 
               {/* Usuario y Botón de Cerrar Sesión (Ubicado en el perfil como en BCP) */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                {onOpenBiometricEnroll && (
+                  <button
+                    type="button"
+                    onClick={onOpenBiometricEnroll}
+                    className="flex items-center gap-1.5 text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+                    title="Enrolar o registrar tu rostro con WebCam (Google MediaPipe 3D)"
+                  >
+                    <ScanFace className="w-4 h-4 text-teal-600" />
+                    <span>{user?.hasBiometrics || user?.biometriaActiva ? "Actualizar Face ID" : "Registrar Rostro"}</span>
+                  </button>
+                )}
+
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-yape-700 text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
                     {user.avatar || "AL"}
@@ -317,14 +331,26 @@ export default function ResponsiveLayout({
                     </div>
 
                     {/* Resumen de Seguridad Activa */}
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-extrabold text-slate-800">Protección Antifraude Activa</div>
+                          <div className="text-[11px] text-slate-500 font-medium">Random Forest • Biometría 3D MediaPipe</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xs font-extrabold text-slate-800">Protección Antifraude Activa</div>
-                        <div className="text-[11px] text-slate-500 font-medium">Supervisado por Random Forest • Inferencia local</div>
-                      </div>
+                      {onOpenBiometricEnroll && (
+                        <button
+                          type="button"
+                          onClick={onOpenBiometricEnroll}
+                          className="text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <ScanFace className="w-3.5 h-3.5 text-teal-600" />
+                          <span>{user?.hasBiometrics || user?.biometriaActiva ? "Re-enrolar Rostro" : "Enrolar Face ID"}</span>
+                        </button>
+                      )}
                     </div>
 
                   </div>

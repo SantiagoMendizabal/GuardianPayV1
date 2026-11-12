@@ -318,6 +318,7 @@ export default function App() {
       currentRisk={riskResult || currentInspectorRisk}
       liveInputs={liveInputs}
       onUpdateInput={(key, val) => setLiveInputs(prev => ({ ...prev, [key]: val }))}
+      onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
     >
       {/* 1. Login Screen */}
       {currentScreen === 'LOGIN' && (
@@ -397,7 +398,15 @@ export default function App() {
 
       {/* Biometric Face Scan Modal (2s Simulation) */}
       {isBiometricScanOpen && (
-        <BiometricModal user={user} onComplete={handleBiometricComplete} onCancel={() => setIsBiometricScanOpen(false)} />
+        <BiometricModal 
+          user={user} 
+          onComplete={handleBiometricComplete} 
+          onCancel={() => setIsBiometricScanOpen(false)}
+          onOpenEnroll={() => {
+            setIsBiometricScanOpen(false);
+            setIsEnrollOpen(true);
+          }}
+        />
       )}
 
       {/* AI Inspector Drawer (Solo en móvil cuando se activa el toggle) */}
