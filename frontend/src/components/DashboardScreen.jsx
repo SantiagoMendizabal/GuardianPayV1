@@ -98,9 +98,10 @@ export default function DashboardScreen({
               type="button"
               onClick={onOpenBiometricEnroll}
               className="text-[10px] text-mint font-semibold bg-mint/15 hover:bg-mint/25 border border-mint/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-all cursor-pointer"
+              title="Registrar o actualizar biometría facial 3D"
             >
               <ScanFace className="w-3 h-3 text-mint" />
-              <span>{user?.hasBiometrics || user?.biometriaActiva ? "Face ID: Activo" : "Enrolar Face ID"}</span>
+              <span>{user?.hasBiometrics || user?.biometriaActiva ? "Face ID: Activo (Actualizar)" : "Registrar Rostro (Face ID)"}</span>
             </button>
           </div>
         </div>

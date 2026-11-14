@@ -303,79 +303,81 @@ export default function App() {
   };
 
   return (
-    <ResponsiveLayout
-      currentScreen={currentScreen}
-      user={user}
-      transactions={transactions}
-      onNavigate={(screen) => {
-        if (screen === 'DASHBOARD') {
-          setRiskResult(null);
-          setPendingTx(null);
-        }
-        setCurrentScreen(screen);
-      }}
-      onLogout={handleLogout}
-      currentRisk={riskResult || currentInspectorRisk}
-      liveInputs={liveInputs}
-      onUpdateInput={(key, val) => setLiveInputs(prev => ({ ...prev, [key]: val }))}
-      onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
-    >
-      {/* 1. Login Screen */}
-      {currentScreen === 'LOGIN' && (
-        <LoginScreen onLoginSuccess={handleLogin} />
-      )}
+    <>
+      <ResponsiveLayout
+        currentScreen={currentScreen}
+        user={user}
+        transactions={transactions}
+        onNavigate={(screen) => {
+          if (screen === 'DASHBOARD') {
+            setRiskResult(null);
+            setPendingTx(null);
+          }
+          setCurrentScreen(screen);
+        }}
+        onLogout={handleLogout}
+        currentRisk={riskResult || currentInspectorRisk}
+        liveInputs={liveInputs}
+        onUpdateInput={(key, val) => setLiveInputs(prev => ({ ...prev, [key]: val }))}
+        onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
+      >
+        {/* 1. Login Screen */}
+        {currentScreen === 'LOGIN' && (
+          <LoginScreen onLoginSuccess={handleLogin} />
+        )}
 
-      {/* 2. Dashboard Screen */}
-      {currentScreen === 'DASHBOARD' && (
-        <DashboardScreen
-          user={user}
-          transactions={transactions}
-          onNavigateTransfer={() => setCurrentScreen('TRANSFER')}
-          onNavigateAuditoria={() => setCurrentScreen('AUDITORIA')}
-          onLogout={handleLogout}
-          isInspectorOpen={isInspectorOpen}
-          onToggleInspector={() => setIsInspectorOpen(!isInspectorOpen)}
-          onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
-        />
-      )}
+        {/* 2. Dashboard Screen */}
+        {currentScreen === 'DASHBOARD' && (
+          <DashboardScreen
+            user={user}
+            transactions={transactions}
+            onNavigateTransfer={() => setCurrentScreen('TRANSFER')}
+            onNavigateAuditoria={() => setCurrentScreen('AUDITORIA')}
+            onLogout={handleLogout}
+            isInspectorOpen={isInspectorOpen}
+            onToggleInspector={() => setIsInspectorOpen(!isInspectorOpen)}
+            onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
+          />
+        )}
 
-      {/* 2.1 Dashboard de Auditoría IA (Sprint 3 - Actividad 1 de Santiago) */}
-      {currentScreen === 'AUDITORIA' && (
-        <DashboardAuditoria
-          onBack={() => setCurrentScreen('DASHBOARD')}
-          onNavigateTransfer={() => setCurrentScreen('TRANSFER')}
-        />
-      )}
+        {/* 2.1 Dashboard de Auditoría IA (Sprint 3 - Actividad 1 de Santiago) */}
+        {currentScreen === 'AUDITORIA' && (
+          <DashboardAuditoria
+            onBack={() => setCurrentScreen('DASHBOARD')}
+            onNavigateTransfer={() => setCurrentScreen('TRANSFER')}
+          />
+        )}
 
-      {/* 3. Transfer Form Screen */}
-      {currentScreen === 'TRANSFER' && (
-        <TransferScreen
-          user={user}
-          onBack={() => setCurrentScreen('DASHBOARD')}
-          onConfirmTransfer={handleConfirmTransfer}
-          onInputChange={(inputs) => setLiveInputs(inputs)}
-        />
-      )}
+        {/* 3. Transfer Form Screen */}
+        {currentScreen === 'TRANSFER' && (
+          <TransferScreen
+            user={user}
+            onBack={() => setCurrentScreen('DASHBOARD')}
+            onConfirmTransfer={handleConfirmTransfer}
+            onInputChange={(inputs) => setLiveInputs(inputs)}
+          />
+        )}
 
-      {/* 4. Voucher Exitoso Screen (Risk < 70% or Validated) */}
-      {currentScreen === 'VOUCHER' && (
-        <VoucherScreen
-          transaction={pendingTx}
-          user={user}
-          onReturnHome={handleReturnHome}
-          onNewTransfer={() => setCurrentScreen('TRANSFER')}
-        />
-      )}
+        {/* 4. Voucher Exitoso Screen (Risk < 70% or Validated) */}
+        {currentScreen === 'VOUCHER' && (
+          <VoucherScreen
+            transaction={pendingTx}
+            user={user}
+            onReturnHome={handleReturnHome}
+            onNewTransfer={() => setCurrentScreen('TRANSFER')}
+          />
+        )}
 
-      {/* 5. Fraud Alert Screen (Risk >= 70%) */}
-      {currentScreen === 'FRAUD_ALERT' && (
-        <FraudAlertScreen
-          transaction={pendingTx}
-          riskResult={riskResult}
-          onStartBiometricScan={handleStartBiometricScan}
-          onCancelAndProtect={handleCancelAndProtect}
-        />
-      )}
+        {/* 5. Fraud Alert Screen (Risk >= 70%) */}
+        {currentScreen === 'FRAUD_ALERT' && (
+          <FraudAlertScreen
+            transaction={pendingTx}
+            riskResult={riskResult}
+            onStartBiometricScan={handleStartBiometricScan}
+            onCancelAndProtect={handleCancelAndProtect}
+          />
+        )}
+      </ResponsiveLayout>
 
       {/* Evaluating with AI Overlay (1s Simulation) */}
       {isEvaluating && (
@@ -385,7 +387,7 @@ export default function App() {
         />
       )}
 
-            {/* Biometric Enroll Modal (Google MediaPipe 3D) */}
+      {/* Biometric Enroll Modal (Google MediaPipe 3D) */}
       {isEnrollOpen && (
         <BiometricEnrollModal
           user={user}
@@ -416,6 +418,6 @@ export default function App() {
         currentRisk={riskResult || currentInspectorRisk}
         currentInputs={liveInputs}
       />
-    </ResponsiveLayout>
+    </>
   );
 }

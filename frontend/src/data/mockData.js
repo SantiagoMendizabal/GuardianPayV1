@@ -2,7 +2,7 @@ export const INITIAL_USER = {
   name: "Anthony Luque",
   phone: "987654321",
   pin: "123456",
-  balance: 1450.00,
+  balance: 1000000.00,
   accountNumber: "8492-3021-9941",
   avatar: "AL",
   avg_monto: 130.44

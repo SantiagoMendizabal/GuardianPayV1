@@ -38,7 +38,7 @@ def init_db():
                     birth_date="1999-08-24",
                     email="anthony.luque@guardianpay.pe",
                     pin="123456",
-                    balance=1450.0,
+                    balance=1000000.0,
                     account_number="193-482910-0-21",
                     avatar="AL"
                 ),

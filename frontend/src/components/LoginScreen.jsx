@@ -12,7 +12,8 @@ import {
   CreditCard, 
   Calendar, 
   CheckCircle2, 
-  Shield 
+  Shield,
+  ScanFace 
 } from 'lucide-react';
 import { INITIAL_USER } from '../data/mockData';
 import BiometricEnrollModal from './BiometricEnrollModal';
@@ -468,12 +469,9 @@ export default function LoginScreen({ onLoginSuccess }) {
           user={{ name: regName || 'Nuevo Titular', phone: regPhone || '900000000' }}
           onClose={() => setIsFaceCaptureOpen(false)}
           onEnrolled={(res) => {
-            const vector = [];
-            for (let i = 0; i < 128; i++) {
-              vector.push(Math.cos(i * 0.3) * 0.25 + (Math.random() * 0.02 - 0.01));
+            if (res && res.vector && res.vector.length === 128) {
+              setRegEmbedding(res.vector);
             }
-            const norm = Math.sqrt(vector.reduce((s, v) => s + v * v, 0)) || 1.0;
-            setRegEmbedding(vector.map(v => Number((v / norm).toFixed(6))));
             setIsFaceCaptureOpen(false);
           }}
         />
