@@ -5,11 +5,12 @@ import {
   Sparkles, 
   X, 
   Camera, 
-  Activity,
-  AlertCircle,
-  RotateCcw,
-  ShieldCheck,
-  Compass
+  Activity, 
+  AlertCircle, 
+  RotateCcw, 
+  ShieldCheck, 
+  Compass,
+  Check
 } from 'lucide-react';
 import { enrolarBiometriaAPI } from '../services/aiFraudEngine';
 import { 
@@ -23,10 +24,11 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState("Iniciando sensor óptico de alta precisión...");
+  const [statusText, setStatusText] = useState("Iniciando sensor óptico de tu laptop...");
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [detectedFramesCount, setDetectedFramesCount] = useState(0);
 
   // Estados de pose y orientación facial
   const [poseFeedback, setPoseFeedback] = useState({
@@ -45,7 +47,8 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
   const collectedVectorsRef = useRef([]);
   const validConsecutiveMsRef = useRef(0);
   const isCompletedRef = useRef(false);
-  const lastPoseRef = useRef({ isStraight: false });
+  const lastPoseRef = useRef({ hasFace: false, isStraight: false });
+  const isSendingFrameRef = useRef(false);
 
   // 1. Iniciar cámara WebCam del usuario
   async function startCamera() {
@@ -111,7 +114,7 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
     }
   }
 
-  // 2. Inicializar MediaPipe FaceMesh y ciclo de frames
+  // 2. Inicializar MediaPipe FaceMesh y ciclo controlado de frames
   useEffect(() => {
     isComponentMounted.current = true;
     let animId = null;
@@ -136,19 +139,21 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
             lastPoseRef.current = pose;
             setPoseFeedback(pose);
 
-            // Color de la malla según si la cabeza está recta
+            // Malla verde si está recto o ámbar si se inclina
             const meshColor = pose.isStraight ? '#00D69E' : '#F59E0B';
             drawMediaPipeMesh(ctx, landmarks, canvas.width, canvas.height, meshColor, pose.isStraight);
 
-            // Si el rostro está recto, extraer el vector biométrico 128D
-            if (pose.isStraight) {
-              const vec = extractBiometric128Vector(landmarks);
-              if (vec && vec.length === 128) {
-                collectedVectorsRef.current.push(vec);
+            // Extraer vector real 128D
+            const vec = extractBiometric128Vector(landmarks);
+            if (vec && vec.length === 128) {
+              collectedVectorsRef.current.push(vec);
+              if (collectedVectorsRef.current.length > 40) {
+                collectedVectorsRef.current.shift();
               }
+              setDetectedFramesCount(collectedVectorsRef.current.length);
             }
           } else {
-            lastPoseRef.current = { isStraight: false };
+            lastPoseRef.current = { hasFace: false, isStraight: false };
             setPoseFeedback({
               hasFace: false,
               isStraight: false,
@@ -162,13 +167,24 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
 
         faceMeshRef.current = fm;
 
+        // Bucle con semáforo isSendingFrameRef para evitar saturar WebGL
         const sendFrames = async () => {
           if (!isComponentMounted.current || isCompletedRef.current) return;
-          if (videoRef.current && videoRef.current.readyState >= 2 && faceMeshRef.current) {
+          const video = videoRef.current;
+          if (
+            !isSendingFrameRef.current && 
+            video && 
+            video.readyState >= 2 && 
+            video.videoWidth > 0 &&
+            faceMeshRef.current
+          ) {
+            isSendingFrameRef.current = true;
             try {
-              await faceMeshRef.current.send({ image: videoRef.current });
+              await faceMeshRef.current.send({ image: video });
             } catch (e) {
-              // Frame drop habitual si la GPU está ocupada
+              // Frame omitido si la GPU está ocupada
+            } finally {
+              isSendingFrameRef.current = false;
             }
           }
           animId = requestAnimationFrame(sendFrames);
@@ -193,7 +209,7 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
     };
   }, []);
 
-  // 3. Temporizador de 3.0 segundos continuos con el rostro recto
+  // 3. Temporizador de 3.0 segundos continuos con rostro detectado
   useEffect(() => {
     if (isSuccess || isCompletedRef.current) return;
 
@@ -203,34 +219,34 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
         return;
       }
 
-      // Solo avanza el progreso si el rostro está recto y alineado
-      if (lastPoseRef.current.isStraight) {
-        validConsecutiveMsRef.current += 100;
-        const currentSecs = (validConsecutiveMsRef.current / 1000).toFixed(1);
-        const pct = Math.min(100, Math.round((validConsecutiveMsRef.current / 3000) * 100));
-        setProgress(pct);
+      const currentPose = lastPoseRef.current;
+      // Si el rostro está en pantalla
+      if (currentPose && currentPose.hasFace) {
+        if (currentPose.isStraight) {
+          validConsecutiveMsRef.current += 100;
+          const currentSecs = (validConsecutiveMsRef.current / 1000).toFixed(1);
+          const pct = Math.min(100, Math.round((validConsecutiveMsRef.current / 3000) * 100));
+          setProgress(pct);
 
-        if (pct < 35) {
-          setStatusText(`Calibrando morfología 3D... (${currentSecs}s / 3.0s)`);
-        } else if (pct < 75) {
-          setStatusText(`Mapeando 38 puntos y 14 ratios... (${currentSecs}s / 3.0s)`);
-        } else if (pct < 100) {
-          setStatusText(`Generando firma 128D normalizada L2... (${currentSecs}s / 3.0s)`);
-        }
+          if (pct < 35) {
+            setStatusText(`Escaneando 468 landmarks 3D... (${currentSecs}s / 3.0s)`);
+          } else if (pct < 75) {
+            setStatusText(`Mapeando 38 puntos y 14 ratios... (${currentSecs}s / 3.0s)`);
+          } else if (pct < 100) {
+            setStatusText(`Generando firma 128D normalizada L2... (${currentSecs}s / 3.0s)`);
+          }
 
-        // Una vez completados los 3.0 segundos continuos
-        if (validConsecutiveMsRef.current >= 3000) {
-          isCompletedRef.current = true;
-          clearInterval(timer);
-          finishEnrollment();
+          if (validConsecutiveMsRef.current >= 3000) {
+            isCompletedRef.current = true;
+            clearInterval(timer);
+            finishEnrollment();
+          }
+        } else {
+          // Mostrar indicación de pose
+          setStatusText(currentPose.message || "Pon recto el rostro frente a la cámara");
         }
-      } else {
-        // Si el rostro se desvía o no está recto, mostramos advertencia
-        if (lastPoseRef.current.hasFace) {
-          setStatusText(lastPoseRef.current.message);
-        } else if (cameraActive) {
-          setStatusText("Ubica tu rostro dentro del círculo...");
-        }
+      } else if (cameraActive) {
+        setStatusText("Ubica tu rostro dentro del círculo...");
       }
     }, 100);
 
@@ -239,6 +255,7 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
 
   // 4. Finalizar y persistir el vector de 128 flotantes en MySQL
   const finishEnrollment = async () => {
+    if (isSaving || isCompletedRef.current && isSuccess) return;
     setIsSaving(true);
     setStatusText("Persistiendo vector biométrico en MySQL...");
 
@@ -246,8 +263,8 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
       const vectors = collectedVectorsRef.current;
       let finalVector = null;
 
-      if (vectors.length >= 5) {
-        // Promediar los vectores 128D capturados durante los 3 segundos
+      if (vectors.length >= 1) {
+        // Promediar los vectores 128D capturados
         const sum = new Array(128).fill(0);
         for (const v of vectors) {
           for (let i = 0; i < 128; i++) {
@@ -258,12 +275,8 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
         const norm = Math.hypot(...avg) || 1.0;
         finalVector = avg.map(val => Number((val / norm).toFixed(6)));
       } else {
-        // Si por alguna razón hubo pocos frames, extraer del último snapshot
-        setErrorMsg("Captura insuficiente. Por favor mantén el rostro recto durante los 3 segundos.");
+        setErrorMsg("Coloca tu rostro frente a la cámara antes de capturar.");
         setIsSaving(false);
-        validConsecutiveMsRef.current = 0;
-        setProgress(0);
-        isCompletedRef.current = false;
         return;
       }
 
@@ -279,9 +292,8 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
         if (onEnrolled) onEnrolled({ success: true, vector: finalVector, phone });
         setTimeout(() => {
           onClose();
-        }, 1600);
+        }, 1500);
       } else {
-        // En caso de que sea flujo de nuevo registro donde el usuario aún no existe en BD
         if (onEnrolled) {
           onEnrolled({ success: true, vector: finalVector, phone });
           setIsSuccess(true);
@@ -305,19 +317,30 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
     }
   };
 
-  // Reiniciar escaneo si el usuario lo solicita
+  // Botón manual de captura inmediata
+  const handleManualCapture = () => {
+    if (collectedVectorsRef.current.length > 0 || lastPoseRef.current.hasFace) {
+      isCompletedRef.current = true;
+      setProgress(100);
+      finishEnrollment();
+    } else {
+      setErrorMsg("Asegúrate de que tu rostro esté visible en la cámara antes de capturar.");
+    }
+  };
+
   const handleReset = () => {
     collectedVectorsRef.current = [];
     validConsecutiveMsRef.current = 0;
     isCompletedRef.current = false;
     setProgress(0);
+    setDetectedFramesCount(0);
     setErrorMsg(null);
     setIsSuccess(false);
     setStatusText("Centra tu rostro de frente a la cámara...");
   };
 
   // Parámetros para el anillo circular SVG (Apple Face ID style)
-  const size = 260; // Diámetro total
+  const size = 260;
   const strokeWidth = 5;
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -358,7 +381,6 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
           
           {/* Anillo de Progreso Circular SVG */}
           <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none z-30" viewBox={`0 0 ${size + 10} ${size + 10}`}>
-            {/* Pista de fondo con marcas sutiles */}
             <circle
               cx={(size + 10) / 2}
               cy={(size + 10) / 2}
@@ -369,7 +391,6 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
               strokeDasharray="4 6"
               className="opacity-70"
             />
-            {/* Anillo de progreso dinámico */}
             <circle
               cx={(size + 10) / 2}
               cy={(size + 10) / 2}
@@ -426,7 +447,7 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
               </div>
             )}
 
-            {/* Haz de luz de escaneo circular rotativo */}
+            {/* Haz de luz de escaneo circular */}
             {!isSuccess && cameraActive && (
               <div 
                 className={`absolute inset-0 rounded-full pointer-events-none z-20 ${
@@ -456,7 +477,7 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
             )}
           </div>
 
-          {/* Brackets en las cuatro esquinas para efecto biométrico futurista */}
+          {/* Brackets decorativos */}
           <div className="absolute -top-1 -left-1 w-5 h-5 border-t-2 border-l-2 border-mint/60 rounded-tl-lg pointer-events-none" />
           <div className="absolute -top-1 -right-1 w-5 h-5 border-t-2 border-r-2 border-mint/60 rounded-tr-lg pointer-events-none" />
           <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-2 border-l-2 border-mint/60 rounded-bl-lg pointer-events-none" />
@@ -502,6 +523,28 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
             />
           </div>
         </div>
+
+        {/* Botón de Captura Inmediata / Registro Directo */}
+        {!isSuccess && (
+          <button
+            type="button"
+            onClick={handleManualCapture}
+            disabled={isSaving}
+            className={`w-full max-w-xs mx-auto py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+              poseFeedback.hasFace || detectedFramesCount > 0
+                ? 'bg-gradient-to-r from-mint to-emerald-400 text-slate-950 hover:brightness-105 active:scale-[0.98]'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            <Camera className="w-4 h-4" />
+            <span>{isSaving ? "Guardando en MySQL..." : "📸 Capturar y Guardar Rostro"}</span>
+            {detectedFramesCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 bg-slate-950/20 rounded-md text-[10px] font-mono">
+                {detectedFramesCount} frames
+              </span>
+            )}
+          </button>
+        )}
 
         {/* Mensaje de Error si ocurre */}
         {errorMsg && (

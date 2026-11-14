@@ -51,7 +51,8 @@ export default function BiometricModal({
   const collectedVectorsRef = useRef([]);
   const validConsecutiveMsRef = useRef(0);
   const isCompletedRef = useRef(false);
-  const lastPoseRef = useRef({ isStraight: false });
+  const lastPoseRef = useRef({ hasFace: false, isStraight: false });
+  const isSendingFrameRef = useRef(false);
 
   // 1. Iniciar cámara WebCam de la laptop
   async function startCamera() {
@@ -117,7 +118,7 @@ export default function BiometricModal({
     }
   }
 
-  // 2. Inicializar MediaPipe y captura continua
+  // 2. Inicializar MediaPipe y captura continua controlada
   useEffect(() => {
     isComponentMounted.current = true;
     let animId = null;
@@ -152,15 +153,16 @@ export default function BiometricModal({
 
             drawMediaPipeMesh(ctx, landmarks, canvas.width, canvas.height, meshColor, pose.isStraight);
 
-            // Si está recto, extraer vector 128D
-            if (pose.isStraight) {
-              const vec = extractBiometric128Vector(landmarks);
-              if (vec && vec.length === 128) {
-                collectedVectorsRef.current.push(vec);
+            // Si está en pantalla, extraer vector 128D
+            const vec = extractBiometric128Vector(landmarks);
+            if (vec && vec.length === 128) {
+              collectedVectorsRef.current.push(vec);
+              if (collectedVectorsRef.current.length > 40) {
+                collectedVectorsRef.current.shift();
               }
             }
           } else {
-            lastPoseRef.current = { isStraight: false };
+            lastPoseRef.current = { hasFace: false, isStraight: false };
             setPoseFeedback({
               hasFace: false,
               isStraight: false,
@@ -176,10 +178,21 @@ export default function BiometricModal({
 
         const sendFrames = async () => {
           if (!isComponentMounted.current || isCompletedRef.current) return;
-          if (videoRef.current && videoRef.current.readyState >= 2 && faceMeshRef.current) {
+          const video = videoRef.current;
+          if (
+            !isSendingFrameRef.current && 
+            video && 
+            video.readyState >= 2 && 
+            video.videoWidth > 0 &&
+            faceMeshRef.current
+          ) {
+            isSendingFrameRef.current = true;
             try {
-              await faceMeshRef.current.send({ image: videoRef.current });
-            } catch (e) {}
+              await faceMeshRef.current.send({ image: video });
+            } catch (e) {
+            } finally {
+              isSendingFrameRef.current = false;
+            }
           }
           animId = requestAnimationFrame(sendFrames);
         };
@@ -213,31 +226,32 @@ export default function BiometricModal({
         return;
       }
 
-      if (lastPoseRef.current.isStraight) {
-        validConsecutiveMsRef.current += 100;
-        const currentSecs = (validConsecutiveMsRef.current / 1000).toFixed(1);
-        const pct = Math.min(100, Math.round((validConsecutiveMsRef.current / 3000) * 100));
-        setProgress(pct);
+      const currentPose = lastPoseRef.current;
+      if (currentPose && currentPose.hasFace) {
+        if (currentPose.isStraight) {
+          validConsecutiveMsRef.current += 100;
+          const currentSecs = (validConsecutiveMsRef.current / 1000).toFixed(1);
+          const pct = Math.min(100, Math.round((validConsecutiveMsRef.current / 3000) * 100));
+          setProgress(pct);
 
-        if (pct < 35) {
-          setScanningStatus(`Analizando geometría 3D en vivo... (${currentSecs}s / 3.0s)`);
-        } else if (pct < 75) {
-          setScanningStatus(`Extrayendo vector de 128 dimensiones... (${currentSecs}s / 3.0s)`);
-        } else if (pct < 100) {
-          setScanningStatus(`Calculando similitud de coseno contra MySQL... (${currentSecs}s / 3.0s)`);
-        }
+          if (pct < 35) {
+            setScanningStatus(`Analizando geometría 3D en vivo... (${currentSecs}s / 3.0s)`);
+          } else if (pct < 75) {
+            setScanningStatus(`Extrayendo vector de 128 dimensiones... (${currentSecs}s / 3.0s)`);
+          } else if (pct < 100) {
+            setScanningStatus(`Calculando similitud de coseno contra MySQL... (${currentSecs}s / 3.0s)`);
+          }
 
-        if (validConsecutiveMsRef.current >= 3000) {
-          isCompletedRef.current = true;
-          clearInterval(timer);
-          triggerBiometricVerification();
+          if (validConsecutiveMsRef.current >= 3000) {
+            isCompletedRef.current = true;
+            clearInterval(timer);
+            triggerBiometricVerification();
+          }
+        } else {
+          setScanningStatus(currentPose.message || "Pon recto el rostro frente a la cámara");
         }
-      } else {
-        if (lastPoseRef.current.hasFace) {
-          setScanningStatus(lastPoseRef.current.message);
-        } else if (cameraActive) {
-          setScanningStatus("Ubica tu rostro dentro del círculo...");
-        }
+      } else if (cameraActive) {
+        setScanningStatus("Ubica tu rostro dentro del círculo...");
       }
     }, 100);
 
@@ -253,8 +267,7 @@ export default function BiometricModal({
       const vectors = collectedVectorsRef.current;
       let finalVector = null;
 
-      if (vectors.length >= 5) {
-        // Promediar los vectores reales capturados por MediaPipe
+      if (vectors.length >= 1) {
         const sum = new Array(128).fill(0);
         for (const v of vectors) {
           for (let i = 0; i < 128; i++) {
@@ -268,13 +281,13 @@ export default function BiometricModal({
         setVerificationResult({
           verified: false,
           similarity: 0.0,
-          message: "No se capturó un rostro válido durante los 3 segundos."
+          message: "No se capturó un rostro válido."
         });
         setIsVerifying(false);
         return;
       }
 
-      // Si el modo impostor está activado, alteramos drásticamente el vector para simular intruso
+      // Modo Impostor
       if (isImpostorMode) {
         finalVector = finalVector.map((val, idx) => Number((-val * 0.8 + Math.sin(idx * 2) * 0.15).toFixed(6)));
         const norm = Math.hypot(...finalVector) || 1.0;
@@ -330,7 +343,14 @@ export default function BiometricModal({
     setScanningStatus("Centra tu rostro de frente a la cámara...");
   };
 
-  // Parámetros para el anillo circular SVG
+  const handleManualVerify = () => {
+    if (collectedVectorsRef.current.length > 0 || lastPoseRef.current.hasFace) {
+      isCompletedRef.current = true;
+      setProgress(100);
+      triggerBiometricVerification();
+    }
+  };
+
   const size = 260;
   const strokeWidth = 5;
   const radius = (size - strokeWidth * 2) / 2;
@@ -372,12 +392,9 @@ export default function BiometricModal({
           </p>
         </div>
 
-        {/* ============================================================ */}
         {/* VISOR CIRCULAR ESTILO APPLE FACE ID */}
-        {/* ============================================================ */}
         <div className="relative w-[270px] h-[270px] mx-auto flex items-center justify-center my-1 select-none">
           
-          {/* Anillo de Progreso Circular SVG */}
           <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none z-30" viewBox={`0 0 ${size + 10} ${size + 10}`}>
             <circle
               cx={(size + 10) / 2}
@@ -407,7 +424,6 @@ export default function BiometricModal({
             />
           </svg>
 
-          {/* Cuadro circular de cámara */}
           <div className="relative w-[240px] h-[240px] rounded-full overflow-hidden bg-slate-900 border-2 border-slate-700 shadow-[0_0_30px_rgba(0,214,158,0.15)] flex items-center justify-center">
             
             <video
@@ -446,7 +462,6 @@ export default function BiometricModal({
               </div>
             )}
 
-            {/* Haz de luz de escaneo circular */}
             {!verificationResult && cameraActive && (
               <div 
                 className={`absolute inset-0 rounded-full pointer-events-none z-20 ${
@@ -457,7 +472,6 @@ export default function BiometricModal({
               />
             )}
 
-            {/* Overlay de Resultado */}
             {verificationResult && (
               <div className="absolute inset-0 bg-slate-950/92 backdrop-blur-md z-40 flex flex-col items-center justify-center p-3 animate-scale-up">
                 {verificationResult.verified ? (
@@ -502,7 +516,6 @@ export default function BiometricModal({
             )}
           </div>
 
-          {/* Brackets decorativos */}
           <div className="absolute -top-1 -left-1 w-5 h-5 border-t-2 border-l-2 border-mint/60 rounded-tl-lg pointer-events-none" />
           <div className="absolute -top-1 -right-1 w-5 h-5 border-t-2 border-r-2 border-mint/60 rounded-tr-lg pointer-events-none" />
           <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-2 border-l-2 border-mint/60 rounded-bl-lg pointer-events-none" />
@@ -544,6 +557,23 @@ export default function BiometricModal({
             />
           </div>
         </div>
+
+        {/* Botón manual de verificar */}
+        {!verificationResult && (
+          <button
+            type="button"
+            onClick={handleManualVerify}
+            disabled={isVerifying}
+            className={`w-full max-w-xs mx-auto py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+              poseFeedback.hasFace || collectedVectorsRef.current.length > 0
+                ? 'bg-gradient-to-r from-mint to-emerald-400 text-slate-950 hover:brightness-105 active:scale-[0.98]'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            <Camera className="w-4 h-4" />
+            <span>{isVerifying ? "Cotejando en MySQL..." : "📸 Verificar Rostro Ahora"}</span>
+          </button>
+        )}
 
         {/* Toggle de Modo Impostor para Pruebas Académicas */}
         <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[10px]">

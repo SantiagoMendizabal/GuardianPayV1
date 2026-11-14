@@ -33,6 +33,7 @@ export async function waitForMediaPipe(maxWaitMs = 6000) {
 
 /**
  * Inicializa la instancia de Google MediaPipe FaceMesh
+ * Se desactiva refineLandmarks para máximo rendimiento en GPU/CPU (468 landmarks estándar)
  */
 export async function createFaceMeshInstance(onResultsCallback) {
   const isAvailable = await waitForMediaPipe();
@@ -47,9 +48,9 @@ export async function createFaceMeshInstance(onResultsCallback) {
 
   faceMesh.setOptions({
     maxNumFaces: 1,
-    refineLandmarks: true,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
+    refineLandmarks: false,
+    minDetectionConfidence: 0.35,
+    minTrackingConfidence: 0.35
   });
 
   faceMesh.onResults(onResultsCallback);
@@ -85,7 +86,6 @@ export function analyzeFacePose(landmarks) {
   const pRightCheek = landmarks[454];
 
   // 1. Roll: Ángulo lateral de inclinación (en grados)
-  // En coordenadas de imagen, invertido si la cámara tiene espejo
   const dx = pRightEye.x - pLeftEye.x;
   const dy = pRightEye.y - pLeftEye.y;
   const rollRad = Math.atan2(dy, dx);
@@ -99,27 +99,27 @@ export function analyzeFacePose(landmarks) {
   // 3. Pitch: Inclinación arriba/abajo
   const totalH = Math.abs(pChin.y - pForehead.y);
   const noseH = Math.abs(pNoseTip.y - pForehead.y);
-  const pitchRatio = totalH > 0.001 ? noseH / totalH : 0.6;
+  const pitchRatio = totalH > 0.001 ? noseH / totalH : 0.55;
 
   // 4. Tamaño y distancia
   const faceWidth = Math.abs(pRightCheek.x - pLeftCheek.x);
   const centerX = pBridge.x;
   const centerY = pBridge.y;
 
-  // Criterios de cabeza recta:
-  // Roll: tolerancia de +- 8.5 grados
-  const isRollStraight = Math.abs(rollDeg) <= 8.5;
-  // Yaw: ratio simétrico entre 0.65 y 1.55
-  const isYawStraight = yawRatio >= 0.65 && yawRatio <= 1.55;
-  // Pitch: entre 0.48 y 0.74
-  const isPitchStraight = pitchRatio >= 0.48 && pitchRatio <= 0.74;
+  // Criterios ergonómicos y robustos para rostro recto:
+  // Roll: tolerancia de +- 13.5 grados
+  const isRollStraight = Math.abs(rollDeg) <= 13.5;
+  // Yaw: ratio simétrico entre 0.45 y 2.2
+  const isYawStraight = yawRatio >= 0.45 && yawRatio <= 2.2;
+  // Pitch: entre 0.40 y 0.80
+  const isPitchStraight = pitchRatio >= 0.40 && pitchRatio <= 0.80;
   // Distancia óptima
-  const isTooFar = faceWidth < 0.20;
-  const isTooClose = faceWidth > 0.75;
+  const isTooFar = faceWidth < 0.15;
+  const isTooClose = faceWidth > 0.88;
   // Centrado dentro del marco
-  const isCentered = centerX >= 0.28 && centerX <= 0.72 && centerY >= 0.22 && centerY <= 0.78;
+  const isCentered = centerX >= 0.18 && centerX <= 0.82 && centerY >= 0.15 && centerY <= 0.85;
 
-  let message = "¡Excelente! Mantén el rostro recto";
+  let message = "¡Excelente! Rostro detectado y recto";
   let status = "PERFECT";
   let isStraight = false;
 
@@ -139,7 +139,7 @@ export function analyzeFacePose(landmarks) {
     message = "Mira de frente a la cámara";
     status = "TURNED";
   } else if (!isPitchStraight) {
-    message = pitchRatio < 0.48 ? "Baja ligeramente el mentón" : "Mira de frente a la cámara";
+    message = pitchRatio < 0.40 ? "Baja ligeramente el mentón" : "Mira de frente a la cámara";
     status = "PITCHED";
   } else {
     isStraight = true;
@@ -254,6 +254,8 @@ export function extractBiometric128Vector(landmarks) {
 
 /**
  * Dibuja la malla 3D y los landmarks de MediaPipe sobre el canvas
+ * Nota: Dado que el canvas ya tiene CSS transform -scale-x-100 para efecto espejo,
+ * las coordenadas se dibujan directamente como pt.x * width.
  */
 export function drawMediaPipeMesh(ctx, landmarks, width, height, statusColor = '#00D69E', isStraight = true) {
   ctx.clearRect(0, 0, width, height);
@@ -265,10 +267,10 @@ export function drawMediaPipeMesh(ctx, landmarks, width, height, statusColor = '
   ctx.fillStyle = color;
   for (let i = 0; i < landmarks.length; i += 3) {
     const pt = landmarks[i];
-    const px = (1 - pt.x) * width; // Efecto espejo
+    const px = pt.x * width;
     const py = pt.y * height;
     ctx.beginPath();
-    ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+    ctx.arc(px, py, 1.4, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -280,7 +282,7 @@ export function drawMediaPipeMesh(ctx, landmarks, width, height, statusColor = '
     indices.forEach((idx, i) => {
       const pt = landmarks[idx];
       if (!pt) return;
-      const px = (1 - pt.x) * width;
+      const px = pt.x * width;
       const py = pt.y * height;
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
