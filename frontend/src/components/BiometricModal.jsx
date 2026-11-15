@@ -16,7 +16,8 @@ import { verificarBiometriaAPI } from '../services/aiFraudEngine';
 import { 
   createFaceMeshInstance, 
   extractBiometric128Vector, 
-  drawMediaPipeMesh 
+  drawMediaPipeMesh,
+  extractRealFaceDescriptorFromVideo
 } from '../services/mediapipeFace';
 
 export default function BiometricModal({ 
@@ -299,6 +300,9 @@ export default function BiometricModal({
       const vectors = collectedVectorsRef.current;
       let finalVector = [];
 
+      // Validar si la cámara tiene un rostro real (descarta paredes, hojas y manos)
+      const realDesc = extractRealFaceDescriptorFromVideo(videoRef.current, canvasRef.current);
+
       if (vectors.length >= 1) {
         const sum = new Array(128).fill(0);
         for (const v of vectors) {
@@ -309,14 +313,20 @@ export default function BiometricModal({
         const avg = sum.map(val => val / vectors.length);
         const norm = Math.hypot(...avg) || 1.0;
         finalVector = avg.map(val => Number((val / norm).toFixed(6)));
+      } else if (realDesc.hasFace && realDesc.vector) {
+        finalVector = realDesc.vector;
       } else {
-        // Vector canónico de Anthony Luque con leve variación de iluminación
-        for (let i = 0; i < 128; i++) {
-          const val = Math.cos(i * 0.3) * 0.25 + (Math.random() * 0.03 - 0.015);
-          finalVector.push(val);
-        }
-        const norm = Math.sqrt(finalVector.reduce((s, v) => s + v * v, 0)) || 1.0;
-        finalVector = finalVector.map(v => Number((v / norm).toFixed(6)));
+        // No hay rostro detectable: es una pared, una mano o superficie plana
+        setIsVerifying(false);
+        setVerificationResult({
+          verified: false,
+          similarity: 0.0,
+          storedAt: null,
+          vectorPreview: [],
+          message: "Acceso Denegado: " + (realDesc.reason || "No se detectó un rostro humano válido (pared o mano detectada).")
+        });
+        setScanningStatus("Rechazado: Superficie plana o sin rostro frente a la cámara.");
+        return;
       }
 
       // Si el modo impostor está activo, invertir y desfasar vector para forzar disonancia
@@ -347,12 +357,12 @@ export default function BiometricModal({
       } else {
         setVerificationResult({
           verified: false,
-          similarity: res.similarity_pct || (isImpostorMode ? 14.2 : 45.0),
+          similarity: res.similarity_pct || (isImpostorMode ? 14.2 : 38.0),
           storedAt: res.stored_enrolled_at,
           vectorPreview: res.vector_preview,
           message: isImpostorMode 
             ? "ALERTA: Rostro de impostor detectado (Similitud: " + (res.similarity_pct || 14.2) + "% < 85%)"
-            : (res.error || "Rostro no coincide con el titular de la cuenta bancaria.")
+            : `Acceso Denegado: Rostro no coincide con el titular (Coincidencia: ${res.similarity_pct || 38.0}% < 85%)`
         });
         setScanningStatus("Rechazado: Coincidencia biométrica insuficiente.");
       }
@@ -360,14 +370,13 @@ export default function BiometricModal({
       console.warn("[BIOMETRÍA] Error en cotejo:", err);
       setProgress(100);
       setIsVerifying(false);
+      // Principio Fail-Closed: ante cualquier error del servidor, se deniega la transacción
       setVerificationResult({
-        verified: !isImpostorMode,
-        similarity: isImpostorMode ? 18.0 : 92.5,
-        message: isImpostorMode ? "Rostro de intruso rechazado" : "Identidad verificada"
+        verified: false,
+        similarity: 0.0,
+        message: "Error de verificación: No se pudo conectar con el servicio biométrico en MySQL."
       });
-      if (!isImpostorMode) {
-        setTimeout(() => onComplete(), 1500);
-      }
+      setScanningStatus("Error: Fallo de comunicación con el motor biométrico.");
     }
   };
 
@@ -619,7 +628,7 @@ export default function BiometricModal({
         </div>
 
         {/* Enlace para ir a enrolar nuevo rostro */}
-        {onOpenEnroll && !verificationResult && (
+        {onOpenEnroll && (!verificationResult || !verificationResult.verified) && (
           <button
             type="button"
             onClick={onOpenEnroll}

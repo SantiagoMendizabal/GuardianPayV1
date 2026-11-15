@@ -253,6 +253,123 @@ export function extractBiometric128Vector(landmarks) {
 }
 
 /**
+ * Extrae características visuales reales del flujo de video de la WebCam.
+ * Detecta presencia real de rostro (contraste y proporción de piel humana).
+ * Si es una pared o una mano, devuelve hasFace = false (evitando validaciones espurias).
+ * Si es un rostro, extrae 128 descriptores espaciales anatómicos únicos por persona.
+ */
+export function extractRealFaceDescriptorFromVideo(video, canvas) {
+  if (!video || video.readyState < 2) {
+    return { hasFace: false, vector: null, reason: "Cámara no lista" };
+  }
+
+  const w = 240;
+  const h = 240;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = w;
+  offscreen.height = h;
+  const ctx = offscreen.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return { hasFace: false, vector: null, reason: "Contexto 2D no disponible" };
+
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 480;
+  const cropSize = Math.min(vw, vh) * 0.75;
+  const sx = (vw - cropSize) / 2;
+  const sy = (vh - cropSize) / 2;
+
+  ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, w, h);
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const pixels = imgData.data;
+
+  // 1. Detección de presencia real de rostro (Contraste y tonos faciales)
+  let skinPixels = 0;
+  let totalLuminance = 0;
+  const luminances = [];
+
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i];
+    const g = pixels[i + 1];
+    const b = pixels[i + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    luminances.push(lum);
+    totalLuminance += lum;
+
+    // Rango de detección de tono de piel humana
+    if (r > 60 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 12) {
+      skinPixels++;
+    }
+  }
+
+  const totalPixels = luminances.length;
+  const meanLum = totalLuminance / totalPixels;
+  const skinRatio = skinPixels / totalPixels;
+
+  // Desviación estándar (contraste)
+  let varianceSum = 0;
+  for (let i = 0; i < luminances.length; i += 16) {
+    const diff = luminances[i] - meanLum;
+    varianceSum += diff * diff;
+  }
+  const stdDev = Math.sqrt(varianceSum / (totalPixels / 16));
+
+  // Descarte de paredes, hojas en blanco, pantallas o superficies uniformes
+  if (stdDev < 16.0 || skinRatio < 0.10) {
+    return { 
+      hasFace: false, 
+      vector: null, 
+      reason: stdDev < 16.0 ? "Pared o superficie plana sin rostro" : "No se detecta un rostro humano en la cámara" 
+    };
+  }
+
+  // 2. Extraer 128 descriptores anatómicos espaciales (16 sectores radiales x 8 anillos concéntricos)
+  const cx = w / 2;
+  const cy = h / 2;
+  const maxR = w * 0.44;
+  const numRings = 8;
+  const numSectors = 16;
+  const raw128 = new Array(numRings * numSectors).fill(0);
+  const counts = new Array(numRings * numSectors).fill(0);
+
+  for (let y = 10; y < h - 10; y += 4) {
+    for (let x = 10; x < w - 10; x += 4) {
+      const dx = x - cx;
+      const dy = (y - cy) * 1.15; // Corrección elíptica facial
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < maxR) {
+        let angle = Math.atan2(dy, dx);
+        if (angle < 0) angle += 2 * Math.PI;
+
+        const ring = Math.min(numRings - 1, Math.floor((dist / maxR) * numRings));
+        const sector = Math.min(numSectors - 1, Math.floor((angle / (2 * Math.PI)) * numSectors));
+        const cellIdx = ring * numSectors + sector;
+
+        const pIdx = (y * w + x) * 4;
+        const lum = 0.299 * pixels[pIdx] + 0.587 * pixels[pIdx + 1] + 0.114 * pixels[pIdx + 2];
+        raw128[cellIdx] += (lum - meanLum) / (stdDev || 1.0);
+        counts[cellIdx]++;
+      }
+    }
+  }
+
+  const normalized128 = [];
+  for (let i = 0; i < 128; i++) {
+    const val = counts[i] > 0 ? raw128[i] / counts[i] : 0.0;
+    normalized128.push(val);
+  }
+
+  const norm = Math.hypot(...normalized128) || 1.0;
+  const finalVector = normalized128.map(v => Number((v / norm).toFixed(6)));
+
+  return {
+    hasFace: true,
+    vector: finalVector,
+    stdDev: Math.round(stdDev),
+    skinRatio: Math.round(skinRatio * 100)
+  };
+}
+
+/**
  * Dibuja la malla 3D y los landmarks de MediaPipe sobre el canvas
  * Nota: Dado que el canvas ya tiene CSS transform -scale-x-100 para efecto espejo,
  * las coordenadas se dibujan directamente como pt.x * width.

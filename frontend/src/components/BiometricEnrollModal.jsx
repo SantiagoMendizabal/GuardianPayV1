@@ -16,7 +16,8 @@ import { enrolarBiometriaAPI } from '../services/aiFraudEngine';
 import { 
   createFaceMeshInstance, 
   extractBiometric128Vector, 
-  drawMediaPipeMesh 
+  drawMediaPipeMesh,
+  extractRealFaceDescriptorFromVideo
 } from '../services/mediapipeFace';
 
 export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
@@ -304,13 +305,17 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
         const norm = Math.hypot(...avg) || 1.0;
         finalVector = avg.map(val => Number((val / norm).toFixed(6)));
       } else {
-        // Generar vector biométrico facial canónico de 128 flotantes normalizado L2
-        for (let i = 0; i < 128; i++) {
-          const val = Math.cos(i * 0.3) * 0.25 + (Math.random() * 0.02 - 0.01);
-          finalVector.push(val);
+        // Extraer características anatómicas reales del video en vivo
+        const realDesc = extractRealFaceDescriptorFromVideo(videoRef.current, canvasRef.current);
+        if (realDesc.hasFace && realDesc.vector) {
+          finalVector = realDesc.vector;
+        } else {
+          setErrorMsg(realDesc.reason || "Coloca un rostro real frente a la cámara (pared o mano detectada).");
+          setIsSaving(false);
+          isCompletedRef.current = false;
+          setProgress(0);
+          return;
         }
-        const norm = Math.sqrt(finalVector.reduce((s, v) => s + v * v, 0)) || 1.0;
-        finalVector = finalVector.map(v => Number((v / norm).toFixed(6)));
       }
 
       const phone = user?.phone || "987654321";
@@ -330,15 +335,11 @@ export default function BiometricEnrollModal({ user, onClose, onEnrolled }) {
         setErrorMsg(res.error || "No se pudo guardar la biometría.");
       }
     } catch (e) {
-      console.warn("[ENROLAR] Fallback seguro:", e);
-      setProgress(100);
+      console.error("[ENROLAR] Error al guardar vector biométrico:", e);
       setIsSaving(false);
-      setIsSuccess(true);
-      setStatusText("¡Rostro enrolado correctamente!");
-      if (onEnrolled) onEnrolled({ success: true });
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+      isCompletedRef.current = false;
+      setProgress(0);
+      setErrorMsg("Error de comunicación: No se pudo conectar con MySQL para guardar la biometría.");
     }
   };
 
