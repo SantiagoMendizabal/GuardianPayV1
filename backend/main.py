@@ -986,7 +986,8 @@ def enroll_facial_biometrics(payload: EnrollBiometricsRequest, db: Session = Dep
             "message": f"Biometría facial 3D enrolada exitosamente para {user.name}.",
             "phone": user.phone,
             "dimensions": len(payload.embedding),
-            "enrolled_at": user.fecha_enrolamiento.isoformat(),
+            "enrolled_at": user.fecha_enrolamiento.strftime("%Y-%m-%d %H:%M:%S") if user.fecha_enrolamiento else None,
+            "vector_preview": [round(float(x), 4) for x in payload.embedding[:4]],
             "biometria_activa": True
         }
     except Exception as err:
@@ -1042,7 +1043,10 @@ def verify_facial_biometrics(payload: VerifyBiometricsRequest, db: Session = Dep
         "match_quality": match_quality,
         "message": "Identidad biométrica verificada exitosamente." if is_verified else "Rostro no coincide con el titular de la cuenta bancaria.",
         "user_name": user.name,
-        "phone": user.phone
+        "phone": user.phone,
+        "stored_enrolled_at": user.fecha_enrolamiento.strftime("%Y-%m-%d %H:%M:%S") if user.fecha_enrolamiento else None,
+        "vector_dimensions": len(vector_guardado),
+        "vector_preview": [round(x, 4) for x in vector_guardado[:4]]
     }
 
 

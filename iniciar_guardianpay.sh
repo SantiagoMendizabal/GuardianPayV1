@@ -3,8 +3,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 cd "$DIR"
 
-BACKEND_PORT="${BACKEND_PORT:-8001}"
-FRONTEND_PORT="${FRONTEND_PORT:-3001}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 
 echo "=========================================================="
 echo "          INICIANDO SISTEMA GUARDIANPAY (LINUX)           "
