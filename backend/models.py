@@ -19,6 +19,10 @@ class User(Base):
     embedding_facial = Column(Text, nullable=True)  # Vector biométrico 128D serializado en JSON
     biometria_activa = Column(Boolean, default=False, nullable=False)
     fecha_enrolamiento = Column(DateTime, nullable=True)
+    intentos_fallidos_biometria = Column(Integer, default=0, nullable=False)
+    bloqueos_transaccion_consecutivos = Column(Integer, default=0, nullable=False)
+    cuenta_bloqueada = Column(Boolean, default=False, nullable=False)
+    bloqueada_hasta = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relaciones de transacciones
@@ -39,7 +43,11 @@ class User(Base):
             "avatar": self.avatar,
             "hasBiometrics": bool(self.biometria_activa and self.embedding_facial),
             "biometriaActiva": bool(self.biometria_activa),
-            "fechaEnrolamiento": self.fecha_enrolamiento.isoformat() if self.fecha_enrolamiento else None
+            "fechaEnrolamiento": self.fecha_enrolamiento.isoformat() if self.fecha_enrolamiento else None,
+            "intentosFallidosBiometria": self.intentos_fallidos_biometria or 0,
+            "bloqueosConsecutivos": self.bloqueos_transaccion_consecutivos or 0,
+            "cuentaBloqueada": bool(self.cuenta_bloqueada),
+            "bloqueadaHasta": self.bloqueada_hasta.isoformat() if self.bloqueada_hasta else None
         }
 
 # Alias en español para el modelo

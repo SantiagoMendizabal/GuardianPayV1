@@ -592,6 +592,22 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
     if sender.id == recipient.id:
         raise HTTPException(status_code=400, detail="No puedes transferirte dinero a ti mismo.")
 
+    # 2.1 Validar si la cuenta está congelada (3 transacciones bloqueadas por biometría)
+    if sender.cuenta_bloqueada:
+        if sender.bloqueada_hasta and datetime.utcnow() < sender.bloqueada_hasta:
+            horas_restantes = round((sender.bloqueada_hasta - datetime.utcnow()).total_seconds() / 3600, 1)
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cuenta congelada por 24 horas debido a 3 fallos biométricos de seguridad. Desbloqueo en aprox. {horas_restantes} horas (o usa el botón de pruebas 'Desbloquear Cuenta')."
+            )
+        else:
+            # Ventana de 24 horas cumplida: descongelar automáticamente
+            sender.cuenta_bloqueada = False
+            sender.bloqueada_hasta = None
+            sender.bloqueos_transaccion_consecutivos = 0
+            sender.intentos_fallidos_biometria = 0
+            db.commit()
+
     # 3. Validar saldo suficiente
     if sender.balance < payload.amount:
         raise HTTPException(
@@ -1017,6 +1033,31 @@ def verify_facial_biometrics(payload: VerifyBiometricsRequest, db: Session = Dep
     except Exception:
         raise HTTPException(status_code=500, detail="Error de lectura del vector biométrico registrado en MySQL.")
 
+    # 0. Validar si la cuenta está previamente congelada por 24 horas
+    if user.cuenta_bloqueada:
+        if user.bloqueada_hasta and datetime.utcnow() < user.bloqueada_hasta:
+            horas_restantes = round((user.bloqueada_hasta - datetime.utcnow()).total_seconds() / 3600, 1)
+            return {
+                "success": False,
+                "verified": False,
+                "account_frozen": True,
+                "frozen_until": user.bloqueada_hasta.isoformat(),
+                "failed_attempts": 3,
+                "consecutive_blocked_txs": user.bloqueos_transaccion_consecutivos,
+                "similarity": 0.0,
+                "similarity_pct": 0.0,
+                "message": f"🚨 CUENTA CONGELADA POR 24 HORAS: Se bloquearon 3 transacciones por biometría. Restan aprox. {horas_restantes} horas de bloqueo.",
+                "user_name": user.name,
+                "phone": user.phone
+            }
+        else:
+            # Ventana de 24 horas completada: descongelar automáticamente
+            user.cuenta_bloqueada = False
+            user.bloqueada_hasta = None
+            user.bloqueos_transaccion_consecutivos = 0
+            user.intentos_fallidos_biometria = 0
+            db.commit()
+
     # Cálculo matemático de Similitud del Coseno
     similarity = compute_cosine_similarity(vector_guardado, payload.embedding)
     threshold = float(payload.threshold or 0.85)
@@ -1031,8 +1072,68 @@ def verify_facial_biometrics(payload: VerifyBiometricsRequest, db: Session = Dep
     else:
         match_quality = "RECHAZADA_NO_COINCIDE"
 
+    transaction_blocked = False
+    account_frozen = False
+    frozen_until = None
+
+    if is_verified:
+        # Éxito: Reiniciar los contadores de fallos
+        user.intentos_fallidos_biometria = 0
+        user.bloqueos_transaccion_consecutivos = 0
+        db.commit()
+        db.refresh(user)
+    else:
+        # Fallo de cotejo: Incrementar contador de intentos en la transacción actual
+        current_attempts = (user.intentos_fallidos_biometria or 0) + 1
+        user.intentos_fallidos_biometria = current_attempts
+
+        if current_attempts >= 3:
+            # Regla 1: Al tercer intento fallido, se bloquea la transacción
+            transaction_blocked = True
+            user.intentos_fallidos_biometria = 0  # Reiniciar contador de intentos para próximas transacciones
+            new_consecutive_blocks = (user.bloqueos_transaccion_consecutivos or 0) + 1
+            user.bloqueos_transaccion_consecutivos = new_consecutive_blocks
+
+            # Registro de auditoría bancaria de transacción bloqueada por biometría
+            blocked_audit = AuditoriaIA(
+                user_id=user.id,
+                operation_code=f"BLOQ-BIO-{int(datetime.utcnow().timestamp())}",
+                monto_evaluado=0.0,
+                hora_transaccion=datetime.utcnow().strftime("%H:%M"),
+                es_madrugada=0,
+                es_contacto_nuevo=1,
+                es_ubicacion_inusual=1,
+                score_obtenido=100.0,
+                nivel_riesgo="CRÍTICO",
+                decision_ia="TRANSACCION_BLOQUEADA_BIOMETRIA",
+                tiempo_inferencia_ms=1.5
+            )
+            db.add(blocked_audit)
+
+            # Regla 2: Si se acumulan 3 transacciones bloqueadas por biometría -> Congelar 24 horas
+            if new_consecutive_blocks >= 3:
+                user.cuenta_bloqueada = True
+                user.bloqueada_hasta = datetime.utcnow() + timedelta(hours=24)
+                account_frozen = True
+                frozen_until = user.bloqueada_hasta.isoformat()
+
+        db.commit()
+        db.refresh(user)
+
     print(f"\n[BIOMETRÍA 3D] Cotejo Facial para {user.name} ({user.phone}):")
     print(f"               Similitud: {similarity * 100:.2f}% | Umbral: {threshold * 100:.2f}% | Veredicto: {'APROBADO' if is_verified else 'RECHAZADO'}")
+    if not is_verified:
+        print(f"               Intentos Fallidos Tx: {user.intentos_fallidos_biometria}/3 | Tx Bloqueadas Acumuladas: {user.bloqueos_transaccion_consecutivos}/3 | Congelada: {user.cuenta_bloqueada}")
+
+    # Mensaje adaptativo según el nivel de severidad
+    if is_verified:
+        msg = "Identidad biométrica verificada exitosamente."
+    elif account_frozen:
+        msg = "🚨 CUENTA CONGELADA POR 24 HORAS: Se acumularon 3 transacciones bloqueadas por fallos biométricos."
+    elif transaction_blocked:
+        msg = f"Transacción bloqueada: 3 intentos biométricos fallidos (Bloqueos acumulados: {user.bloqueos_transaccion_consecutivos}/3)."
+    else:
+        msg = f"Rostro no coincide con el titular (Intento {user.intentos_fallidos_biometria} de 3)."
 
     return {
         "success": True,
@@ -1041,12 +1142,44 @@ def verify_facial_biometrics(payload: VerifyBiometricsRequest, db: Session = Dep
         "similarity_pct": round(similarity * 100, 2),
         "threshold": round(threshold * 100, 2),
         "match_quality": match_quality,
-        "message": "Identidad biométrica verificada exitosamente." if is_verified else "Rostro no coincide con el titular de la cuenta bancaria.",
+        "failed_attempts": user.intentos_fallidos_biometria,
+        "transaction_blocked": transaction_blocked,
+        "consecutive_blocked_txs": user.bloqueos_transaccion_consecutivos,
+        "account_frozen": bool(user.cuenta_bloqueada),
+        "frozen_until": frozen_until or (user.bloqueada_hasta.isoformat() if user.bloqueada_hasta else None),
+        "message": msg,
         "user_name": user.name,
         "phone": user.phone,
         "stored_enrolled_at": user.fecha_enrolamiento.strftime("%Y-%m-%d %H:%M:%S") if user.fecha_enrolamiento else None,
         "vector_dimensions": len(vector_guardado),
         "vector_preview": [round(x, 4) for x in vector_guardado[:4]]
+    }
+
+
+@app.post("/api/v1/auth/unblock-account/{phone}")
+@app.post("/api/v1/biometria/desbloquear/{phone}")
+def unblock_user_account(phone: str, db: Session = Depends(get_db)):
+    """
+    Restaura y desbloquea la cuenta del usuario para propósitos de pruebas y sustentación académica.
+    Reinicia los intentos fallidos, bloqueos consecutivos y levanta el congelamiento de 24 horas.
+    """
+    user = db.query(User).filter(User.phone == phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    user.intentos_fallidos_biometria = 0
+    user.bloqueos_transaccion_consecutivos = 0
+    user.cuenta_bloqueada = False
+    user.bloqueada_hasta = None
+    db.commit()
+    db.refresh(user)
+
+    print(f"\n[SEGURIDAD] Cuenta desbloqueada para pruebas: {user.name} ({user.phone})")
+
+    return {
+        "success": True,
+        "message": f"Cuenta de {user.name} desbloqueada exitosamente. Intentos biométricos y congelamiento reiniciados a 0.",
+        "user": user.to_dict()
     }
 
 

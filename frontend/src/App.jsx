@@ -11,7 +11,7 @@ import BiometricEnrollModal from './components/BiometricEnrollModal';
 import AiInspectorDrawer from './components/AiInspectorDrawer';
 import DashboardAuditoria from './components/DashboardAuditoria';
 import { INITIAL_USER, INITIAL_TRANSACTIONS } from './data/mockData';
-import { calcularRiesgoIA, evaluarFraudeAPI, ejecutarTransferenciaAPI } from './services/aiFraudEngine';
+import { calcularRiesgoIA, evaluarFraudeAPI, ejecutarTransferenciaAPI, desbloquearCuentaAPI } from './services/aiFraudEngine';
 
 export default function App() {
   // Navigation State
@@ -60,9 +60,15 @@ export default function App() {
       phone: userData.phone || "",
       balance: typeof userData.balance === 'number' ? userData.balance : 500.0,
       accountNumber: userData.accountNumber || userData.account_number || "193-000000-0-00",
-      avatar: userData.avatar || "GP",
+      avatar: userData.avatar || "AL",
       id: userData.id,
-      avg_monto: typeof userData.avg_monto === 'number' ? userData.avg_monto : fallbackAvg
+      avg_monto: typeof userData.avg_monto === 'number' ? userData.avg_monto : fallbackAvg,
+      cuentaBloqueada: Boolean(userData.cuentaBloqueada),
+      bloqueadaHasta: userData.bloqueadaHasta || null,
+      bloqueosConsecutivos: userData.bloqueosConsecutivos || 0,
+      intentosFallidosBiometria: userData.intentosFallidosBiometria || 0,
+      hasBiometrics: Boolean(userData.hasBiometrics || userData.biometriaActiva),
+      biometriaActiva: Boolean(userData.biometriaActiva)
     });
     // Si la cuenta es nueva o no tiene transacciones, su historial debe ser una lista vacía []
     setTransactions(Array.isArray(userData.transactions) ? userData.transactions : []);
@@ -96,6 +102,11 @@ export default function App() {
 
   // Trigger transfer confirmation against MySQL & AI Engine
   const handleConfirmTransfer = async (txPayload) => {
+    if (user?.cuentaBloqueada) {
+      alert("🚨 CUENTA CONGELADA POR 24 HORAS\n\nTu cuenta se encuentra temporalmente congelada por acumular 3 transacciones con fallos biométricos.\n\nPara continuar tus pruebas, presiona el botón 'Desbloquear Cuenta' en el encabezado.");
+      return;
+    }
+
     const { amount, selectedTime, isFrequentContact, selectedLocation, recipientPhone, recipientName } = txPayload;
 
     setLiveInputs({
@@ -295,6 +306,50 @@ export default function App() {
     setCurrentScreen('DASHBOARD');
   };
 
+  // Manejo de bloqueo de transacción tras 3 intentos fallidos de biometría
+  const handleTransactionBlocked = (res) => {
+    setIsBiometricScanOpen(false);
+    setPendingTx(null);
+    setRiskResult(null);
+    setCurrentScreen('DASHBOARD');
+
+    const isFrozen = Boolean(res?.account_frozen);
+    setUser(prev => ({
+      ...prev,
+      cuentaBloqueada: isFrozen,
+      bloqueadaHasta: res?.frozen_until || prev.bloqueadaHasta,
+      bloqueosConsecutivos: res?.consecutive_blocked_txs || prev.bloqueosConsecutivos,
+      intentosFallidosBiometria: 0
+    }));
+
+    if (isFrozen) {
+      alert("🚨 CUENTA CONGELADA POR 24 HORAS\n\nSe han registrado 3 transacciones consecutivas con fallas biométricas.\nPor seguridad bancaria de tus fondos la cuenta ha sido congelada temporalmente.\n\n(Para continuar tus pruebas, presiona el botón 'Desbloquear Cuenta' en el encabezado).");
+    } else {
+      alert(`🛑 TRANSACCIÓN BLOQUEADA\n\nHas alcanzado el límite de 3 intentos biométricos fallidos.\nLa transacción fue cancelada y se ha devuelto a la pantalla de inicio por seguridad.\n(Bloqueos acumulados: ${res?.consecutive_blocked_txs || 1}/3).`);
+    }
+  };
+
+  // Desbloqueo y reseteo de cuenta para pruebas académicas
+  const handleUnblockAccount = async () => {
+    try {
+      const res = await desbloquearCuentaAPI(user?.phone || '987654321');
+      if (res.success && res.user) {
+        setUser(prev => ({
+          ...prev,
+          cuentaBloqueada: false,
+          bloqueadaHasta: null,
+          bloqueosConsecutivos: 0,
+          intentosFallidosBiometria: 0
+        }));
+        alert("🔓 ¡Cuenta desbloqueada con éxito!\n\nSe han restablecido a 0 todos los intentos biométricos fallidos y se levantó el congelamiento de 24 horas para continuar tus pruebas.");
+      } else {
+        alert(res.error || "No se pudo desbloquear la cuenta.");
+      }
+    } catch (e) {
+      alert("Error al conectar con el servidor para desbloquear la cuenta.");
+    }
+  };
+
   // Return to Dashboard from Voucher
   const handleReturnHome = () => {
     setPendingTx(null);
@@ -320,6 +375,7 @@ export default function App() {
         liveInputs={liveInputs}
         onUpdateInput={(key, val) => setLiveInputs(prev => ({ ...prev, [key]: val }))}
         onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
+        onUnblockAccount={handleUnblockAccount}
       >
         {/* 1. Login Screen */}
         {currentScreen === 'LOGIN' && (
@@ -337,6 +393,7 @@ export default function App() {
             isInspectorOpen={isInspectorOpen}
             onToggleInspector={() => setIsInspectorOpen(!isInspectorOpen)}
             onOpenBiometricEnroll={() => setIsEnrollOpen(true)}
+            onUnblockAccount={handleUnblockAccount}
           />
         )}
 
@@ -404,6 +461,8 @@ export default function App() {
           user={user} 
           onComplete={handleBiometricComplete} 
           onCancel={() => setIsBiometricScanOpen(false)}
+          onTransactionBlocked={handleTransactionBlocked}
+          onUnblockAccount={handleUnblockAccount}
           onOpenEnroll={() => {
             setIsBiometricScanOpen(false);
             setIsEnrollOpen(true);

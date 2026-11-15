@@ -162,6 +162,11 @@ export default function TransferScreen({
     e.preventDefault();
     const numAmount = parseFloat(amount);
 
+    if (user?.cuentaBloqueada) {
+      setErrorMsg('🚨 Tu cuenta está congelada temporalmente por 24 horas debido a 3 transacciones con fallos biométricos. Usa el botón "Desbloquear Cuenta" en la barra superior para continuar tus pruebas.');
+      return;
+    }
+
     if (!recipientPhone || recipientPhone.length < 9) {
       setErrorMsg('Ingresa un número celular válido de 9 dígitos.');
       return;

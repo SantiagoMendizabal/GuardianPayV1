@@ -7,7 +7,11 @@ def asegurar_columnas_biometria():
     columnas = [
         ("embedding_facial", "TEXT NULL COMMENT 'Vector biométrico 128D serializado en JSON'"),
         ("biometria_activa", "TINYINT(1) DEFAULT 0 NOT NULL COMMENT 'Flag 1 si tiene rostro registrado'"),
-        ("fecha_enrolamiento", "DATETIME NULL COMMENT 'Fecha y hora en que se enroló el rostro'")
+        ("fecha_enrolamiento", "DATETIME NULL COMMENT 'Fecha y hora en que se enroló el rostro'"),
+        ("intentos_fallidos_biometria", "INT DEFAULT 0 NOT NULL COMMENT 'Intentos biométricos fallidos en la tx actual'"),
+        ("bloqueos_transaccion_consecutivos", "INT DEFAULT 0 NOT NULL COMMENT 'Transacciones bloqueadas por biometría'"),
+        ("cuenta_bloqueada", "TINYINT(1) DEFAULT 0 NOT NULL COMMENT '1 si está congelada 24h'"),
+        ("bloqueada_hasta", "DATETIME NULL COMMENT 'Fin del congelamiento temporal'")
     ]
     try:
         with engine.begin() as conn:

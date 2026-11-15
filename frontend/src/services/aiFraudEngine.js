@@ -577,6 +577,31 @@ export async function obtenerEstadoBiometriaAPI(phone) {
 }
 
 /**
+ * Desbloqueo y reseteo de seguridad de cuenta (POST /api/v1/auth/unblock-account/{phone})
+ * Modo de pruebas: reinicia intentos biométricos fallidos y levanta congelamiento de 24 horas.
+ */
+export async function desbloquearCuentaAPI(phone) {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/api/v1/auth/unblock-account/${encodeURIComponent(phone)}`, {}, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response && error.response.data) {
+      return {
+        success: false,
+        error: error.response.data.detail || 'Error al desbloquear cuenta.'
+      };
+    }
+    return {
+      success: false,
+      error: 'No se pudo conectar con el servidor para desbloquear la cuenta.'
+    };
+  }
+}
+
+/**
  * Obtener estadísticas globales de auditoría de IA para el Dashboard (GET /api/v1/dashboard/stats)
  */
 export async function obtenerEstadisticasDashboardAPI() {

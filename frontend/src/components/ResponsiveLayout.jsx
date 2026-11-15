@@ -27,7 +27,8 @@ import {
   ArrowLeft,
   Settings,
   BarChart3,
-  ScanFace
+  ScanFace,
+  LockOpen
 } from 'lucide-react';
 
 export default function ResponsiveLayout({
@@ -40,6 +41,7 @@ export default function ResponsiveLayout({
   liveInputs,
   onUpdateInput,
   onOpenBiometricEnroll,
+  onUnblockAccount,
   children
 }) {
   const [showDesktopBalance, setShowDesktopBalance] = useState(false);
@@ -222,6 +224,28 @@ export default function ResponsiveLayout({
                   </button>
                 )}
 
+                {onUnblockAccount && (
+                  <button
+                    type="button"
+                    onClick={onUnblockAccount}
+                    className={`flex items-center gap-1.5 text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs border ${
+                      user?.cuentaBloqueada
+                        ? 'bg-red-500 text-white border-red-600 animate-pulse hover:bg-red-600'
+                        : (user?.bloqueosConsecutivos > 0 || user?.intentosFallidosBiometria > 0)
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                    }`}
+                    title="Desbloquear cuenta e inicializar intentos fallidos de biometría (Modo Pruebas)"
+                  >
+                    <LockOpen className="w-4 h-4" />
+                    <span>
+                      {user?.cuentaBloqueada 
+                        ? "🚨 Desbloquear Cuenta (24h)" 
+                        : (user?.bloqueosConsecutivos > 0 ? `Desbloquear (${user.bloqueosConsecutivos}/3 bloqueos)` : "Desbloquear")}
+                    </span>
+                  </button>
+                )}
+
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-yape-700 text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
                     {user.avatar || "AL"}
@@ -341,16 +365,33 @@ export default function ResponsiveLayout({
                           <div className="text-[11px] text-slate-500 font-medium">Random Forest • Biometría 3D MediaPipe</div>
                         </div>
                       </div>
-                      {onOpenBiometricEnroll && (
-                        <button
-                          type="button"
-                          onClick={onOpenBiometricEnroll}
-                          className="text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                        >
-                          <ScanFace className="w-3.5 h-3.5 text-teal-600" />
-                          <span>{user?.hasBiometrics || user?.biometriaActiva ? "Re-enrolar Rostro" : "Enrolar Face ID"}</span>
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {onOpenBiometricEnroll && (
+                          <button
+                            type="button"
+                            onClick={onOpenBiometricEnroll}
+                            className="text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <ScanFace className="w-3.5 h-3.5 text-teal-600" />
+                            <span>{user?.hasBiometrics || user?.biometriaActiva ? "Re-enrolar" : "Enrolar"}</span>
+                          </button>
+                        )}
+                        {onUnblockAccount && (
+                          <button
+                            type="button"
+                            onClick={onUnblockAccount}
+                            className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border ${
+                              user?.cuentaBloqueada
+                                ? 'bg-red-500 text-white border-red-600 animate-pulse'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300'
+                            }`}
+                            title="Desbloquear cuenta para pruebas"
+                          >
+                            <LockOpen className="w-3.5 h-3.5" />
+                            <span>Desbloquear</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                   </div>

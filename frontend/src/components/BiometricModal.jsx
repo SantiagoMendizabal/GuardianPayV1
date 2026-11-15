@@ -10,9 +10,11 @@ import {
   Activity, 
   AlertTriangle, 
   Compass, 
-  ShieldCheck
+  ShieldCheck,
+  LockOpen,
+  Lock
 } from 'lucide-react';
-import { verificarBiometriaAPI } from '../services/aiFraudEngine';
+import { verificarBiometriaAPI, desbloquearCuentaAPI } from '../services/aiFraudEngine';
 import { 
   createFaceMeshInstance, 
   extractBiometric128Vector, 
@@ -24,7 +26,9 @@ export default function BiometricModal({
   user, 
   onComplete, 
   onCancel,
-  onOpenEnroll
+  onOpenEnroll,
+  onTransactionBlocked,
+  onUnblockAccount
 }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
@@ -299,6 +303,7 @@ export default function BiometricModal({
     try {
       const vectors = collectedVectorsRef.current;
       let finalVector = [];
+      let surfaceRejectedReason = null;
 
       // Validar si la cámara tiene un rostro real (descarta paredes, hojas y manos)
       const realDesc = extractRealFaceDescriptorFromVideo(videoRef.current, canvasRef.current);
@@ -317,16 +322,9 @@ export default function BiometricModal({
         finalVector = realDesc.vector;
       } else {
         // No hay rostro detectable: es una pared, una mano o superficie plana
-        setIsVerifying(false);
-        setVerificationResult({
-          verified: false,
-          similarity: 0.0,
-          storedAt: null,
-          vectorPreview: [],
-          message: "Acceso Denegado: " + (realDesc.reason || "No se detectó un rostro humano válido (pared o mano detectada).")
-        });
-        setScanningStatus("Rechazado: Superficie plana o sin rostro frente a la cámara.");
-        return;
+        surfaceRejectedReason = realDesc.reason || "Pared o superficie plana sin rostro";
+        // Enviamos vector nulo para que la API registre el fallo biométrico formalmente en MySQL
+        finalVector = new Array(128).fill(0.0);
       }
 
       // Si el modo impostor está activo, invertir y desfasar vector para forzar disonancia
@@ -355,16 +353,44 @@ export default function BiometricModal({
           onComplete();
         }, 1600);
       } else {
+        // Falló el cotejo biométrico
+        const blocked = Boolean(res.transaction_blocked);
+        const frozen = Boolean(res.account_frozen);
+        const failedCount = res.failed_attempts || 1;
+        const consecutiveBlocks = res.consecutive_blocked_txs || 0;
+
         setVerificationResult({
           verified: false,
-          similarity: res.similarity_pct || (isImpostorMode ? 14.2 : 38.0),
+          similarity: res.similarity_pct || 0.0,
+          transactionBlocked: blocked,
+          accountFrozen: frozen,
+          frozenUntil: res.frozen_until,
+          failedAttempts: failedCount,
+          consecutiveBlocks: consecutiveBlocks,
           storedAt: res.stored_enrolled_at,
           vectorPreview: res.vector_preview,
+          reason: surfaceRejectedReason,
           message: isImpostorMode 
             ? "ALERTA: Rostro de impostor detectado (Similitud: " + (res.similarity_pct || 14.2) + "% < 85%)"
-            : `Acceso Denegado: Rostro no coincide con el titular (Coincidencia: ${res.similarity_pct || 38.0}% < 85%)`
+            : (res.message || "Rostro no coincide con el titular de la cuenta bancaria.")
         });
-        setScanningStatus("Rechazado: Coincidencia biométrica insuficiente.");
+
+        if (blocked) {
+          setScanningStatus(frozen
+            ? "🚨 ¡CUENTA CONGELADA POR 24 HORAS! Regresando al inicio..."
+            : "🛑 ¡TRANSACCIÓN BLOQUEADA! 3 intentos fallidos."
+          );
+          // Retornar al Dashboard después de mostrar la alerta
+          setTimeout(() => {
+            if (onTransactionBlocked) {
+              onTransactionBlocked(res);
+            } else {
+              onCancel();
+            }
+          }, 3200);
+        } else {
+          setScanningStatus(`Intento fallido ${failedCount} de 3: Coincidencia insuficiente.`);
+        }
       }
     } catch (err) {
       console.warn("[BIOMETRÍA] Error en cotejo:", err);
@@ -374,6 +400,8 @@ export default function BiometricModal({
       setVerificationResult({
         verified: false,
         similarity: 0.0,
+        transactionBlocked: false,
+        failedAttempts: 1,
         message: "Error de verificación: No se pudo conectar con el servicio biométrico en MySQL."
       });
       setScanningStatus("Error: Fallo de comunicación con el motor biométrico.");
@@ -412,14 +440,29 @@ export default function BiometricModal({
             <span>Face ID 3D • Google MediaPipe</span>
           </div>
 
-          {onCancel && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={onCancel}
-              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+              type="button"
+              onClick={async () => {
+                if (onUnblockAccount) await onUnblockAccount();
+                else await desbloquearCuentaAPI(user?.phone || '987654321');
+                handleRetry();
+              }}
+              className="text-[10px] font-bold px-2 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 transition-all flex items-center gap-1 cursor-pointer"
+              title="Restablecer intentos fallidos a 0 para pruebas"
             >
-              <X className="w-4 h-4" />
+              <LockOpen className="w-3 h-3 text-indigo-300" />
+              <span>Desbloquear</span>
             </button>
-          )}
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Challenge Warning */}
@@ -532,31 +575,87 @@ export default function BiometricModal({
                       </span>
                     )}
                   </div>
+                ) : verificationResult.transactionBlocked ? (
+                  /* 🚨 PANTALLA DE TRANSACCIÓN BLOQUEADA / CUENTA CONGELADA */
+                  <div className="flex flex-col items-center text-center p-2">
+                    <div className="w-14 h-14 rounded-full bg-red-600/30 text-red-500 border-2 border-red-500 flex items-center justify-center shadow-lg mb-1.5 animate-bounce">
+                      <ShieldX className="w-9 h-9 stroke-[2.5]" />
+                    </div>
+                    <span className="text-xs font-black text-red-400 uppercase tracking-wider">
+                      {verificationResult.accountFrozen ? "🚨 Cuenta Congelada 24h" : "🛑 Transacción Bloqueada"}
+                    </span>
+                    <span className="text-[11px] font-bold text-white mt-0.5 leading-tight">
+                      {verificationResult.accountFrozen 
+                        ? "3 transacciones bloqueadas por biometría" 
+                        : "3 intentos fallidos consecutivos"}
+                    </span>
+                    <span className="text-[9px] text-red-200 mt-1 max-w-[210px] leading-tight">
+                      {verificationResult.accountFrozen 
+                        ? "Tu cuenta ha sido congelada temporalmente por 24 horas por normativa SBS."
+                        : "La transacción se ha cancelado y se devolverá a la pantalla de inicio."}
+                    </span>
+
+                    <div className="mt-2.5 flex flex-col gap-1.5 w-full max-w-[210px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onTransactionBlocked) onTransactionBlocked(verificationResult);
+                          else onCancel();
+                        }}
+                        className="w-full py-1.5 px-3 bg-red-600 hover:bg-red-500 rounded-xl text-xs font-bold text-white transition-all cursor-pointer shadow-md"
+                      >
+                        Volver al Inicio Ahora
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (onUnblockAccount) await onUnblockAccount();
+                          else await desbloquearCuentaAPI(user?.phone || '987654321');
+                          handleRetry();
+                        }}
+                        className="w-full py-1 px-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-[10px] font-bold text-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <LockOpen className="w-3 h-3 text-mint" />
+                        <span>Desbloquear (Modo Pruebas)</span>
+                      </button>
+                    </div>
+                  </div>
                 ) : (
+                  /* ⚠️ REINTENTO DISPONIBLE (INTENTO 1 o 2 DE 3) */
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 flex items-center justify-center shadow-lg mb-2">
-                      <ShieldX className="w-10 h-10 stroke-[2.5]" />
+                    <div className="w-14 h-14 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 flex items-center justify-center shadow-lg mb-1.5">
+                      <ShieldX className="w-8 h-8 stroke-[2.5]" />
                     </div>
                     <span className="text-xs font-black text-red-400 uppercase tracking-wider">
                       Rostro Rechazado
                     </span>
-                    <span className="text-sm font-extrabold text-white mt-1">
+                    <span className="text-sm font-extrabold text-white">
                       Similitud: {verificationResult.similarity}%
                     </span>
-                    <span className="text-[10px] text-red-300 mt-0.5 max-w-[190px] leading-tight">
-                      No coincide con el titular registrado (&lt; 85%)
+
+                    {/* Indicador de Intentos 1, 2, 3 */}
+                    <div className="flex items-center gap-1.5 my-1 bg-red-950/60 border border-red-800/60 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-red-300">
+                      <span>Intento {verificationResult.failedAttempts || 1} de 3</span>
+                      <div className="flex items-center gap-1 ml-1">
+                        <span className={`w-2 h-2 rounded-full ${(verificationResult.failedAttempts || 1) >= 1 ? 'bg-red-500' : 'bg-slate-600'}`} />
+                        <span className={`w-2 h-2 rounded-full ${(verificationResult.failedAttempts || 1) >= 2 ? 'bg-red-500' : 'bg-slate-600'}`} />
+                        <span className={`w-2 h-2 rounded-full ${(verificationResult.failedAttempts || 1) >= 3 ? 'bg-red-500' : 'bg-slate-600'}`} />
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] text-red-300 max-w-[190px] leading-tight">
+                      {verificationResult.reason || "No coincide con el titular registrado (< 85%)"}
                     </span>
-                    {verificationResult.storedAt && (
-                      <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                        Vector MySQL: {verificationResult.storedAt}
-                      </span>
-                    )}
+                    <span className="text-[10px] text-amber-300 font-semibold mt-0.5">
+                      Queda(n) {3 - (verificationResult.failedAttempts || 1)} intento(s) antes del bloqueo.
+                    </span>
+
                     <button
                       onClick={handleRetry}
-                      className="mt-2.5 px-3 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                      className="mt-2 px-3 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Reintentar Escaneo</span>
+                      <span>Reintentar Escaneo ({(verificationResult.failedAttempts || 1) + 1}/3)</span>
                     </button>
                   </div>
                 )}

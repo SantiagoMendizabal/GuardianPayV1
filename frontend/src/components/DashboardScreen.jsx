@@ -13,7 +13,9 @@ import {
   LogOut,
   Sparkles,
   ScanFace,
-  BarChart3
+  BarChart3,
+  LockOpen,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function DashboardScreen({
@@ -24,7 +26,8 @@ export default function DashboardScreen({
   onLogout,
   isInspectorOpen,
   onToggleInspector,
-  onOpenBiometricEnroll
+  onOpenBiometricEnroll,
+  onUnblockAccount
 }) {
   // En Yape el saldo inicia oculto por defecto para mayor privacidad
   const [showBalance, setShowBalance] = useState(false);
@@ -94,26 +97,77 @@ export default function DashboardScreen({
               <ShieldCheck className="w-3.5 h-3.5 text-mint" />
               <span className="font-semibold">Protección Antifraude Activa</span>
             </div>
-            <button
-              type="button"
-              onClick={onOpenBiometricEnroll}
-              className="text-[10px] text-mint font-semibold bg-mint/15 hover:bg-mint/25 border border-mint/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-all cursor-pointer"
-              title="Registrar o actualizar biometría facial 3D"
-            >
-              <ScanFace className="w-3 h-3 text-mint" />
-              <span>{user?.hasBiometrics || user?.biometriaActiva ? "Face ID: Activo (Actualizar)" : "Registrar Rostro (Face ID)"}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onOpenBiometricEnroll}
+                className="text-[10px] text-mint font-semibold bg-mint/15 hover:bg-mint/25 border border-mint/30 px-2 py-0.5 rounded-full flex items-center gap-1 transition-all cursor-pointer"
+                title="Registrar o actualizar biometría facial 3D"
+              >
+                <ScanFace className="w-3 h-3 text-mint" />
+                <span>{user?.hasBiometrics || user?.biometriaActiva ? "Actualizar" : "Enrolar"}</span>
+              </button>
+
+              {onUnblockAccount && (
+                <button
+                  type="button"
+                  onClick={onUnblockAccount}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 transition-all cursor-pointer border ${
+                    user?.cuentaBloqueada
+                      ? 'bg-red-500 text-white border-red-600 animate-pulse'
+                      : (user?.bloqueosConsecutivos > 0 || user?.intentosFallidosBiometria > 0)
+                        ? 'bg-amber-400 text-slate-950 border-amber-300'
+                        : 'bg-white/10 text-white/90 border-white/20 hover:bg-white/20'
+                  }`}
+                  title="Desbloquear cuenta para pruebas académicas"
+                >
+                  <LockOpen className="w-3 h-3" />
+                  <span>{user?.cuentaBloqueada ? "Desbloquear (24h)" : "Desbloquear"}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
       </div>
+
+      {/* BANNER DE CUENTA CONGELADA POR 24 HORAS */}
+      {user?.cuentaBloqueada && (
+        <div className="mx-5 my-2 p-3 bg-red-500/15 border-2 border-red-500 rounded-2xl flex items-start gap-2.5 animate-pulse shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="text-xs font-black text-red-700 uppercase tracking-wide">
+              🚨 Cuenta Congelada por 24 Horas
+            </div>
+            <div className="text-[11px] text-red-600 mt-0.5 leading-snug">
+              Se bloquearon 3 transacciones por fallos consecutivos en reconocimiento facial. Las operaciones han sido restringidas por seguridad de tus fondos.
+            </div>
+            {onUnblockAccount && (
+              <button
+                type="button"
+                onClick={onUnblockAccount}
+                className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              >
+                <LockOpen className="w-3.5 h-3.5" />
+                <span>Desbloquear Cuenta Ahora (Modo Pruebas)</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="px-5 py-4 space-y-4 flex-1">
         
         {/* Main CTA: Transferir Dinero - Solid Yape Brand Button */}
         <button
-          onClick={onNavigateTransfer}
+          onClick={() => {
+            if (user?.cuentaBloqueada) {
+              alert("🚨 Tu cuenta se encuentra temporalmente congelada por 24 horas debido a 3 transacciones con fallos biométricos.\n\nUsa el botón 'Desbloquear Cuenta' para restablecerla para tus pruebas.");
+              return;
+            }
+            onNavigateTransfer();
+          }}
           className="w-full py-4 px-5 rounded-2xl bg-yape-700 hover:bg-yape-800 active:scale-[0.99] text-white font-bold shadow-md flex items-center justify-between group transition-all cursor-pointer border border-yape-600"
         >
           <div className="flex items-center gap-3">
