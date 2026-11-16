@@ -797,16 +797,7 @@ export default function TransferScreen({
                     </div>
                   </div>
 
-                  {/* Explicación Técnica para el Profesor */}
-                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-300 space-y-2">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono">
-                      <GitBranch className="w-4 h-4" />
-                      <span>¿Cómo sustentar esto ante el docente o jurado?</span>
-                    </div>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">
-                      En <b>MySQL</b> solo se almacenan los campos de entrada binarios (0 o 1) y el score resultante para auditoría bancaria. El cálculo real de los <b>120 árboles de decisión</b> se ejecuta en tiempo real en la memoria RAM del servidor Python cargando el modelo serializado <code className="text-emerald-300 font-mono">random_forest_fraud.pkl</code>.
-                    </p>
-                  </div>
+
 
                 </div>
               );
