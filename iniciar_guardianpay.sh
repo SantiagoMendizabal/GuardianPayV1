@@ -3,8 +3,24 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 cd "$DIR"
 
-BACKEND_PORT="${BACKEND_PORT:-8000}"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+# Detección inteligente de puertos (si 8000 o 3000 están ocupados por Docker, usar 8001 y 3001)
+if [ -z "$BACKEND_PORT" ]; then
+  if ss -tulpn | grep -q ":8000 "; then
+    BACKEND_PORT=8001
+  else
+    BACKEND_PORT=8000
+  fi
+fi
+
+if [ -z "$FRONTEND_PORT" ]; then
+  if ss -tulpn | grep -q ":3000 "; then
+    FRONTEND_PORT=3001
+  else
+    FRONTEND_PORT=3000
+  fi
+fi
+
+DATABASE_URL="${DATABASE_URL:-mysql+pymysql://root:admin123@localhost:3306/guardianpay_db}"
 
 echo "=========================================================="
 echo "          INICIANDO SISTEMA GUARDIANPAY (LINUX)           "
