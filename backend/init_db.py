@@ -4,6 +4,8 @@ from models import User, Transaction
 
 def asegurar_columnas_biometria():
     """Verifica y añade automáticamente las columnas de biometría en MySQL si faltan."""
+    if engine.dialect.name != "mysql":
+        return
     columnas = [
         ("embedding_facial", "TEXT NULL COMMENT 'Vector biométrico 128D serializado en JSON'"),
         ("biometria_activa", "TINYINT(1) DEFAULT 0 NOT NULL COMMENT 'Flag 1 si tiene rostro registrado'"),
