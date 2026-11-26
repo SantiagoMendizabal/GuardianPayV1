@@ -300,7 +300,7 @@ export async function buscarDestinatarioAPI(phone, senderPhone) {
 
   try {
     const res = await axios.get(`${API_BASE_URL}/api/v1/usuarios/lookup`, {
-      params: { 
+      params: {
         phone: cleanPhone,
         sender_phone: senderPhone || undefined
       },
@@ -337,6 +337,35 @@ export async function buscarDestinatarioAPI(phone, senderPhone) {
 }
 
 /**
+ * Detecta la IP pública real del cliente y su geolocalización desde el backend
+ * Endpoint: GET /api/v1/geo/current
+ */
+export async function obtenerGeoActualAPI() {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/v1/geo/current`, {
+      timeout: 3000
+    });
+    return res.data;
+  } catch (err) {
+    console.warn('[GuardianPay] Error al consultar /geo/current:', err.message);
+    return {
+      success: true,
+      client_ip: "127.0.0.1",
+      geo: {
+        ip: "127.0.0.1",
+        city: "Arequipa",
+        region: "Arequipa",
+        country: "Perú",
+        lat: -16.409047,
+        lng: -71.537451,
+        is_local: true,
+        source: "fallback_client_local"
+      }
+    };
+  }
+}
+
+/**
  * Ejecuta una transferencia atómica real en MySQL debitando emisor y acreditando receptor
  * Endpoint: POST /api/v1/transfer
  */
@@ -346,7 +375,11 @@ export async function ejecutarTransferenciaAPI({
   amount,
   hora = "14:30",
   location = "Arequipa",
-  forceApprove = false
+  forceApprove = false,
+  latitude = null,
+  longitude = null,
+  clientIp = null,
+  isGps = false
 }) {
   const payload = {
     sender_phone: senderPhone,
@@ -354,7 +387,11 @@ export async function ejecutarTransferenciaAPI({
     amount: parseFloat(amount),
     hora,
     location,
-    force_approve: Boolean(forceApprove)
+    force_approve: Boolean(forceApprove),
+    latitude: typeof latitude === 'number' ? latitude : null,
+    longitude: typeof longitude === 'number' ? longitude : null,
+    client_ip: clientIp,
+    is_gps: Boolean(isGps)
   };
 
   try {

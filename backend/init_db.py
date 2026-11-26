@@ -1,9 +1,30 @@
 from database import engine, Base, SessionLocal
 from models import User, Transaction
+from sqlalchemy import text
 
 def init_db():
     print("[INFO] Creando tablas en MySQL guardianpay_db...")
     Base.metadata.create_all(bind=engine)
+    
+    # Migración segura de columnas geográficas (Incremento 3)
+    try:
+        with engine.connect() as conn:
+            # Comprobar columnas existentes en transferencias
+            result = conn.execute(text("SHOW COLUMNS FROM transferencias"))
+            columns = [row[0] for row in result.fetchall()]
+            
+            if "latitude" not in columns:
+                conn.execute(text("ALTER TABLE transferencias ADD COLUMN latitude FLOAT NULL DEFAULT -16.409047;"))
+                print("[INFO] Columna 'latitude' agregada a tabla 'transferencias'.")
+            if "longitude" not in columns:
+                conn.execute(text("ALTER TABLE transferencias ADD COLUMN longitude FLOAT NULL DEFAULT -71.537451;"))
+                print("[INFO] Columna 'longitude' agregada a tabla 'transferencias'.")
+            if "ip_address" not in columns:
+                conn.execute(text("ALTER TABLE transferencias ADD COLUMN ip_address VARCHAR(45) NULL DEFAULT '127.0.0.1';"))
+                print("[INFO] Columna 'ip_address' agregada a tabla 'transferencias'.")
+            conn.commit()
+    except Exception as col_err:
+        print(f"[WARN] Verificación de columnas geográficas en transferencias: {col_err}")
     
     db = SessionLocal()
     try:

@@ -93,7 +93,18 @@ export default function App() {
 
   // Trigger transfer confirmation against MySQL & AI Engine
   const handleConfirmTransfer = async (txPayload) => {
-    const { amount, selectedTime, isFrequentContact, selectedLocation, recipientPhone, recipientName } = txPayload;
+    const { 
+      amount, 
+      selectedTime, 
+      isFrequentContact, 
+      selectedLocation, 
+      recipientPhone, 
+      recipientName,
+      latitude,
+      longitude,
+      clientIp,
+      isGps
+    } = txPayload;
 
     setLiveInputs({
       monto: amount,
@@ -106,7 +117,7 @@ export default function App() {
     setIsEvaluating(true);
 
     try {
-      // Llamada atómica al backend MySQL con Random Forest
+      // Llamada atómica al backend MySQL con Random Forest y GeoService (Incremento 3)
       const [backendRes] = await Promise.all([
         ejecutarTransferenciaAPI({
           senderPhone: user.phone,
@@ -114,13 +125,24 @@ export default function App() {
           amount,
           hora: selectedTime,
           location: selectedLocation,
-          forceApprove: false
+          forceApprove: false,
+          latitude,
+          longitude,
+          clientIp,
+          isGps
         }),
         new Promise((resolve) => setTimeout(resolve, 1100))
       ]);
 
+      const travelData = backendRes.impossible_travel_data || backendRes.risk_result?.impossibleTravelData;
+
       if (backendRes.is_blocked) {
         // Interceptado por alta probabilidad de fraude (>= 70%) -> Exigir desafío biométrico
+        const enhancedRiskResult = {
+          ...backendRes.risk_result,
+          impossibleTravelData: travelData
+        };
+
         const pending = {
           id: `tx-pending-${Date.now()}`,
           title: `Transferencia a ${recipientName || 'Destinatario'}`,
@@ -133,20 +155,25 @@ export default function App() {
           riskScore: backendRes.risk_result?.score || 75.0,
           status: "bloqueado",
           type: "egreso",
+          impossibleTravelData: travelData,
           payloadForApproval: {
             senderPhone: user.phone,
             recipientPhone,
             amount,
             hora: selectedTime,
             location: selectedLocation,
-            forceApprove: true
+            forceApprove: true,
+            latitude,
+            longitude,
+            clientIp,
+            isGps
           }
         };
 
         pendingTxRef.current = pending;
-        riskResultRef.current = backendRes.risk_result;
+        riskResultRef.current = enhancedRiskResult;
         setPendingTx(pending);
-        setRiskResult(backendRes.risk_result);
+        setRiskResult(enhancedRiskResult);
         setIsEvaluating(false);
         setCurrentScreen('FRAUD_ALERT');
         return;
@@ -154,11 +181,18 @@ export default function App() {
 
       if (backendRes.success) {
         // Transferencia completada atómicamente en MySQL
-        const completedTx = backendRes.transaction;
+        const completedTx = {
+          ...backendRes.transaction,
+          impossibleTravelData: travelData
+        };
+        const enhancedRiskResult = {
+          ...backendRes.risk_result,
+          impossibleTravelData: travelData
+        };
         pendingTxRef.current = completedTx;
-        riskResultRef.current = backendRes.risk_result;
+        riskResultRef.current = enhancedRiskResult;
         setPendingTx(completedTx);
-        setRiskResult(backendRes.risk_result);
+        setRiskResult(enhancedRiskResult);
         setIsEvaluating(false);
 
         // Actualizar saldo emisor en tiempo real desde MySQL

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Cpu
 } from 'lucide-react';
+import ImpossibleTravelMap from './ImpossibleTravelMap';
 
 export default function FraudAlertScreen({
   transaction,
@@ -32,6 +33,18 @@ export default function FraudAlertScreen({
     score = 92,
     activeAnomalies = []
   } = riskResult || {};
+
+  // Extraer datos de viaje imposible del backend
+  const travelData = riskResult?.impossibleTravelData 
+    || transaction?.impossibleTravelData 
+    || transaction?.payloadForApproval?.impossibleTravelData;
+
+  const isImpossibleTravel = Boolean(travelData?.impossible_travel) 
+    || activeAnomalies.some(f => f.id === 'location' && (
+      f.name?.toLowerCase().includes('imposible') || 
+      f.description?.toLowerCase().includes('imposible') ||
+      f.description?.toLowerCase().includes('km/h')
+    ));
 
   return (
     <div className="flex-1 flex flex-col justify-between bg-gradient-to-b from-slate-950 via-[#1f0606] to-slate-950 text-white animate-fade-in p-5 overflow-y-auto">
@@ -112,6 +125,11 @@ export default function FraudAlertScreen({
             )}
           </div>
         </div>
+
+        {/* Mapa Interactivo Leaflet de Viaje Imposible (Incremento 3) */}
+        {isImpossibleTravel && (
+          <ImpossibleTravelMap travelData={travelData} />
+        )}
 
         {/* Security Message */}
         <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px] flex items-center gap-2 text-left">

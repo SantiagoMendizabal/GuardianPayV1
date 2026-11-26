@@ -5,7 +5,7 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional, Union, List, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -29,6 +29,17 @@ from database import engine, Base, SessionLocal, get_db
 from models import User, Transaction, AuditoriaIA, ContactoFrecuente, Usuario, Transferencia
 from init_db import init_db
 import hashlib
+
+# Importar Servicio de Geolocalización y Viaje Imposible (Incremento 3)
+from services.geo_service import (
+    extract_client_ip,
+    resolve_ip_geolocation,
+    haversine_distance_km,
+    resolve_coordinates_for_location_string,
+    evaluate_impossible_travel,
+    DEFAULT_BASE_GEO,
+    KNOWN_NODES
+)
 
 def hash_pin(pin: str) -> str:
     salt = os.urandom(16).hex()
@@ -131,6 +142,7 @@ class PredictionResponse(BaseModel):
     modelConfidence: str
     modelVersion: str
     executionTimeMs: float
+    impossibleTravelData: Optional[Dict[str, Any]] = None
 
 
 class RegisterRequest(BaseModel):
@@ -155,6 +167,10 @@ class TransferExecutionRequest(BaseModel):
     hora: str = Field("14:30", example="14:30")
     location: str = Field("Arequipa", example="Arequipa")
     force_approve: Optional[bool] = Field(False, description="Aprobación forzada tras escaneo biométrico exitoso")
+    latitude: Optional[float] = Field(None, example=-16.409047, description="Latitud real o simulada")
+    longitude: Optional[float] = Field(None, example=-71.537451, description="Longitud real o simulada")
+    client_ip: Optional[str] = Field(None, example="190.237.12.45", description="IP del cliente detectada")
+    is_gps: Optional[bool] = Field(False, description="True si coordenadas provienen del GPS del navegador")
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +198,7 @@ def compute_ai_risk(
     velocity_count_15m: int = 0,
     impossible_travel: bool = False,
     impossible_travel_detail: str = "",
+    impossible_travel_data: Optional[Dict[str, Any]] = None,
     monto_promedio_historico: float = 80.0
 ) -> PredictionResponse:
     start_time = datetime.now()
@@ -351,7 +368,8 @@ def compute_ai_risk(
         evaluatedAt=datetime.now().strftime("%I:%M:%S %p"),
         modelConfidence=f"{round(metadata.get('roc_auc_score', 0.82) * 100, 1)}%",
         modelVersion=f"GuardianShield-v{metadata.get('version', '2.0.0')}-RF",
-        executionTimeMs=elapsed_ms
+        executionTimeMs=elapsed_ms,
+        impossibleTravelData=impossible_travel_data
     )
 
 
@@ -529,6 +547,21 @@ def lookup_recipient(
 # ---------------------------------------------------------------------------
 # Endpoints de Transferencia y Machine Learning
 # ---------------------------------------------------------------------------
+@app.get("/api/v1/geo/current")
+def get_current_geo(request: Request):
+    """
+    Paso 1: Detecta la IP real del cliente (X-Forwarded-For en Caddy/Nginx o host)
+    y consulta la API GeoIP con timeout <= 0.8s y caché en memoria.
+    """
+    client_ip = extract_client_ip(request)
+    geo_data = resolve_ip_geolocation(client_ip)
+    return {
+        "success": True,
+        "client_ip": client_ip,
+        "geo": geo_data
+    }
+
+
 @app.post("/api/v1/predict", response_model=PredictionResponse)
 def predict_fraud_endpoint(tx: TransactionRequest):
     """Endpoint directo de inferencia predictiva independiente."""
@@ -549,7 +582,11 @@ def predict_fraud_endpoint(tx: TransactionRequest):
 @app.post("/api/v1/transfer")
 @app.post("/api/v1/transferir")
 @app.post("/api/v1/transferencias")
-def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(get_db)):
+def execute_transfer(
+    payload: TransferExecutionRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Transferencia bancaria atómica entre dos usuarios registrados en MySQL.
     1. Verifica existencia de emisor y receptor en MySQL.
@@ -600,7 +637,23 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
     ).all()
     avg_monto = (sum(t.amount for t in all_past_tx) / len(all_past_tx)) if all_past_tx else 80.0
 
-    # 4.3 Detección de "Viaje Imposible" (Impossible Travel Velocity)
+    # 4.3 Detección Cinemática de "Viaje Imposible" (Paso 1 y 2 - Haversine & IP Real)
+    client_ip = (payload.client_ip or "").strip() or extract_client_ip(request)
+
+    # Determinar coordenadas actuales (prioridad: GPS / Selector -> GeoIP -> Nodo conocido)
+    if payload.latitude is not None and payload.longitude is not None:
+        curr_lat = float(payload.latitude)
+        curr_lng = float(payload.longitude)
+        curr_loc_name = payload.location or "Ubicación Actual"
+    else:
+        resolved_geo = resolve_ip_geolocation(client_ip)
+        if resolved_geo and not resolved_geo.get("is_local"):
+            curr_lat = float(resolved_geo["lat"])
+            curr_lng = float(resolved_geo["lng"])
+            curr_loc_name = f"{resolved_geo['city']} ({resolved_geo['country']})"
+        else:
+            curr_lat, curr_lng, curr_loc_name = resolve_coordinates_for_location_string(payload.location)
+
     last_tx = db.query(Transaction).filter(
         Transaction.sender_id == sender.id,
         Transaction.status == "COMPLETADO"
@@ -608,25 +661,33 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
 
     impossible_travel = False
     travel_detail = ""
-    if last_tx and last_tx.location_str and last_tx.created_at:
-        min_elapsed = max(0.5, (now_utc - last_tx.created_at).total_seconds() / 60.0)
-        loc_prev = (last_tx.location_str or "").strip().lower()
-        loc_curr = (payload.location or "").strip().lower()
+    travel_data = None
 
-        if loc_prev and loc_curr and loc_prev != loc_curr:
-            dist_map = {
-                ("arequipa", "lima"): 1010,
-                ("lima", "arequipa"): 1010,
-                ("arequipa", "ip extranjera"): 4500,
-                ("ip extranjera", "arequipa"): 4500,
-                ("lima", "ip extranjera"): 4500,
-                ("ip extranjera", "lima"): 4500
-            }
-            km = dist_map.get((loc_prev, loc_curr), 800)
-            # Si el cambio ocurrió en menos de 60 minutos, es físicamente imposible viajar esa distancia
-            if min_elapsed < 60:
-                impossible_travel = True
-                travel_detail = f"Transacción previa en {last_tx.location_str} hace {int(min_elapsed)} min y ahora en {payload.location} ({km} km). Velocidad físicamente imposible."
+    if last_tx and last_tx.created_at:
+        # Extraer coordenadas previas de MySQL o inferir por nombre histórico
+        prev_lat = getattr(last_tx, "latitude", None)
+        prev_lng = getattr(last_tx, "longitude", None)
+        if prev_lat is None or prev_lng is None:
+            prev_lat, prev_lng, _ = resolve_coordinates_for_location_string(last_tx.location_str)
+
+        prev_origin_name = last_tx.location_str or "Arequipa Centro"
+
+        # Evaluar cinemática con fórmula de Haversine y límite físico de 120 km/h
+        travel_data = evaluate_impossible_travel(
+            prev_lat=prev_lat,
+            prev_lng=prev_lng,
+            prev_time=last_tx.created_at,
+            curr_lat=curr_lat,
+            curr_lng=curr_lng,
+            curr_time=now_utc,
+            origin_name=prev_origin_name,
+            dest_name=curr_loc_name,
+            is_gps=bool(payload.is_gps)
+        )
+
+        if travel_data["impossible_travel"]:
+            impossible_travel = True
+            travel_detail = travel_data["detail"]
 
     # 4.4 Contacto frecuente
     previous_transfers_count = db.query(Transaction).filter(
@@ -662,6 +723,7 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
         velocity_count_15m=velocity_count_15m,
         impossible_travel=impossible_travel,
         impossible_travel_detail=travel_detail,
+        impossible_travel_data=travel_data,
         monto_promedio_historico=avg_monto
     )
 
@@ -693,6 +755,7 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
             "decision": "DESAFIO_BIOMETRICO",
             "message": "Operación interceptada por sospecha de fraude bancario.",
             "risk_result": risk_eval.dict(),
+            "impossible_travel_data": travel_data,
             "recipient": {
                 "name": recipient.name,
                 "phone": recipient.phone
@@ -712,6 +775,9 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
             amount=payload.amount,
             time_str=payload.hora,
             location_str=payload.location,
+            latitude=curr_lat,
+            longitude=curr_lng,
+            ip_address=client_ip,
             is_frequent_contact=is_frequent,
             risk_score=risk_eval.score,
             risk_level=risk_eval.riskLevel,
@@ -768,7 +834,8 @@ def execute_transfer(payload: TransferExecutionRequest, db: Session = Depends(ge
             "message": "Transferencia realizada con éxito.",
             "transaction": new_tx.to_dict(current_user_id=sender.id),
             "sender_new_balance": round(sender.balance, 2),
-            "risk_result": risk_eval.dict()
+            "risk_result": risk_eval.dict(),
+            "impossible_travel_data": travel_data
         }
     except Exception as err:
         db.rollback()

@@ -50,6 +50,9 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     time_str = Column(String(20), nullable=False)
     location_str = Column(String(60), default="Arequipa")
+    latitude = Column(Float, nullable=True, default=-16.409047)
+    longitude = Column(Float, nullable=True, default=-71.537451)
+    ip_address = Column(String(45), nullable=True, default="127.0.0.1")
     is_frequent_contact = Column(Boolean, default=True)
     risk_score = Column(Float, nullable=False)
     risk_level = Column(String(20), nullable=False)
@@ -75,6 +78,10 @@ class Transaction(Base):
             "recipient": counterpart.name if counterpart else "Destinatario",
             "recipientPhone": counterpart.phone if counterpart else "",
             "date": f"Hoy, {self.time_str.replace(' AM', '').replace(' PM', '')}",
+            "location": self.location_str,
+            "latitude": self.latitude if getattr(self, "latitude", None) is not None else -16.409047,
+            "longitude": self.longitude if getattr(self, "longitude", None) is not None else -71.537451,
+            "ipAddress": getattr(self, "ip_address", "127.0.0.1") or "127.0.0.1",
             "riskScore": self.risk_score,
             "riskLevel": self.risk_level,
             "status": self.status.lower(),
