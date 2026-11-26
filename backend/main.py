@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import joblib
 import pandas as pd
 import numpy as np
@@ -153,11 +154,24 @@ class RegisterRequest(BaseModel):
     birth_date: Optional[str] = Field("1999-05-15", description="Fecha de nacimiento AAAA-MM-DD")
     email: Optional[str] = Field(None, description="Correo electrónico")
     initial_balance: Optional[float] = Field(500.0, description="Saldo inicial promocional")
+    embedding: Optional[List[float]] = Field(None, description="Vector biométrico 128D si se enroló durante el registro")
 
 
 class LoginRequest(BaseModel):
     phone: str = Field(..., min_length=9, max_length=9, example="987654321")
     pin: str = Field("123456", min_length=6, max_length=6, example="123456")
+
+
+class EnrollBiometricsRequest(BaseModel):
+    phone: str = Field(..., min_length=9, max_length=9, description="Teléfono celular del titular", example="987654321")
+    embedding: List[float] = Field(..., description="Vector biométrico de 128 flotantes extraído por Google MediaPipe")
+    source: Optional[str] = Field("GOOGLE_MEDIAPIPE_3D", description="Fuente de captura")
+
+
+class VerifyBiometricsRequest(BaseModel):
+    phone: str = Field(..., min_length=9, max_length=9, description="Teléfono celular del emisor", example="987654321")
+    embedding: List[float] = Field(..., description="Vector facial extraído en vivo frente a la WebCam")
+    threshold: Optional[float] = Field(0.85, ge=0.50, le=0.99, description="Umbral mínimo de similitud del coseno (por defecto 85%)")
 
 
 class TransferExecutionRequest(BaseModel):
@@ -167,10 +181,10 @@ class TransferExecutionRequest(BaseModel):
     hora: str = Field("14:30", example="14:30")
     location: str = Field("Arequipa", example="Arequipa")
     force_approve: Optional[bool] = Field(False, description="Aprobación forzada tras escaneo biométrico exitoso")
-    latitude: Optional[float] = Field(None, example=-16.409047, description="Latitud real o simulada")
-    longitude: Optional[float] = Field(None, example=-71.537451, description="Longitud real o simulada")
-    client_ip: Optional[str] = Field(None, example="190.237.12.45", description="IP del cliente detectada")
-    is_gps: Optional[bool] = Field(False, description="True si coordenadas provienen del GPS del navegador")
+    latitude: Optional[float] = Field(None, example=-16.409047, description="Latitud real o simulada del cliente")
+    longitude: Optional[float] = Field(None, example=-71.537451, description="Longitud real o simulada del cliente")
+    client_ip: Optional[str] = Field(None, example="190.237.12.45", description="IP del cliente detectada en frontend")
+    is_gps: Optional[bool] = Field(False, description="True si las coordenadas provienen del GPS del navegador")
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +212,6 @@ def compute_ai_risk(
     velocity_count_15m: int = 0,
     impossible_travel: bool = False,
     impossible_travel_detail: str = "",
-    impossible_travel_data: Optional[Dict[str, Any]] = None,
     monto_promedio_historico: float = 80.0
 ) -> PredictionResponse:
     start_time = datetime.now()
@@ -368,8 +381,7 @@ def compute_ai_risk(
         evaluatedAt=datetime.now().strftime("%I:%M:%S %p"),
         modelConfidence=f"{round(metadata.get('roc_auc_score', 0.82) * 100, 1)}%",
         modelVersion=f"GuardianShield-v{metadata.get('version', '2.0.0')}-RF",
-        executionTimeMs=elapsed_ms,
-        impossibleTravelData=impossible_travel_data
+        executionTimeMs=elapsed_ms
     )
 
 
@@ -462,6 +474,7 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
     parts = payload.name.strip().split()
     avatar = (parts[0][0] + (parts[1][0] if len(parts) > 1 else parts[0][1])).upper()
 
+    has_face = bool(payload.embedding and len(payload.embedding) >= 64)
     new_user = User(
         dni=payload.dni,
         name=payload.name,
@@ -471,7 +484,10 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
         email=payload.email,
         balance=payload.initial_balance or 500.0,
         account_number=account_num,
-        avatar=avatar
+        avatar=avatar,
+        embedding_facial=json.dumps(payload.embedding) if has_face else None,
+        biometria_activa=has_face,
+        fecha_enrolamiento=datetime.utcnow() if has_face else None
     )
 
     db.add(new_user)
@@ -550,8 +566,8 @@ def lookup_recipient(
 @app.get("/api/v1/geo/current")
 def get_current_geo(request: Request):
     """
-    Paso 1: Detecta la IP real del cliente (X-Forwarded-For en Caddy/Nginx o host)
-    y consulta la API GeoIP con timeout <= 0.8s y caché en memoria.
+    Paso 1 (Incremento 3): Detecta la IP real del cliente (X-Forwarded-For o host)
+    y consulta GeoIP con timeout <= 0.8s y caché en memoria.
     """
     client_ip = extract_client_ip(request)
     geo_data = resolve_ip_geolocation(client_ip)
@@ -582,11 +598,7 @@ def predict_fraud_endpoint(tx: TransactionRequest):
 @app.post("/api/v1/transfer")
 @app.post("/api/v1/transferir")
 @app.post("/api/v1/transferencias")
-def execute_transfer(
-    payload: TransferExecutionRequest,
-    request: Request,
-    db: Session = Depends(get_db)
-):
+def execute_transfer(payload: TransferExecutionRequest, request: Request, db: Session = Depends(get_db)):
     """
     Transferencia bancaria atómica entre dos usuarios registrados en MySQL.
     1. Verifica existencia de emisor y receptor en MySQL.
@@ -610,6 +622,22 @@ def execute_transfer(
 
     if sender.id == recipient.id:
         raise HTTPException(status_code=400, detail="No puedes transferirte dinero a ti mismo.")
+
+    # 2.1 Validar si la cuenta está congelada (3 transacciones bloqueadas por biometría)
+    if sender.cuenta_bloqueada:
+        if sender.bloqueada_hasta and datetime.utcnow() < sender.bloqueada_hasta:
+            horas_restantes = round((sender.bloqueada_hasta - datetime.utcnow()).total_seconds() / 3600, 1)
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cuenta congelada por 24 horas debido a 3 fallos biométricos de seguridad. Desbloqueo en aprox. {horas_restantes} horas (o usa el botón de pruebas 'Desbloquear Cuenta')."
+            )
+        else:
+            # Ventana de 24 horas cumplida: descongelar automáticamente
+            sender.cuenta_bloqueada = False
+            sender.bloqueada_hasta = None
+            sender.bloqueos_transaccion_consecutivos = 0
+            sender.intentos_fallidos_biometria = 0
+            db.commit()
 
     # 3. Validar saldo suficiente
     if sender.balance < payload.amount:
@@ -637,10 +665,16 @@ def execute_transfer(
     ).all()
     avg_monto = (sum(t.amount for t in all_past_tx) / len(all_past_tx)) if all_past_tx else 80.0
 
-    # 4.3 Detección Cinemática de "Viaje Imposible" (Paso 1 y 2 - Haversine & IP Real)
+    # Última transacción del emisor (para comparar ubicación previa)
+    last_tx = db.query(Transaction).filter(
+        Transaction.sender_id == sender.id,
+        Transaction.status == "COMPLETADO"
+    ).order_by(Transaction.id.desc()).first()
+
+    # 4.3 Detección Cinemática de "Viaje Imposible" con Haversine real (Incremento 3)
     client_ip = (payload.client_ip or "").strip() or extract_client_ip(request)
 
-    # Determinar coordenadas actuales (prioridad: GPS / Selector -> GeoIP -> Nodo conocido)
+    # Determinar coordenadas actuales (prioridad: GPS/Selector frontend → GeoIP → nodo conocido)
     if payload.latitude is not None and payload.longitude is not None:
         curr_lat = float(payload.latitude)
         curr_lng = float(payload.longitude)
@@ -654,17 +688,12 @@ def execute_transfer(
         else:
             curr_lat, curr_lng, curr_loc_name = resolve_coordinates_for_location_string(payload.location)
 
-    last_tx = db.query(Transaction).filter(
-        Transaction.sender_id == sender.id,
-        Transaction.status == "COMPLETADO"
-    ).order_by(Transaction.id.desc()).first()
-
     impossible_travel = False
     travel_detail = ""
     travel_data = None
 
     if last_tx and last_tx.created_at:
-        # Extraer coordenadas previas de MySQL o inferir por nombre histórico
+        # Coordenadas previas: desde MySQL o inferidas por nombre de ciudad
         prev_lat = getattr(last_tx, "latitude", None)
         prev_lng = getattr(last_tx, "longitude", None)
         if prev_lat is None or prev_lng is None:
@@ -723,7 +752,6 @@ def execute_transfer(
         velocity_count_15m=velocity_count_15m,
         impossible_travel=impossible_travel,
         impossible_travel_detail=travel_detail,
-        impossible_travel_data=travel_data,
         monto_promedio_historico=avg_monto
     )
 
@@ -845,6 +873,115 @@ def execute_transfer(
 # ---------------------------------------------------------------------------
 # Endpoints de Auditoría IA y Contactos Frecuentes (MySQL)
 # ---------------------------------------------------------------------------
+@app.get("/api/v1/dashboard/stats")
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    """
+    Calcula agregaciones estadísticas de auditoría IA para el Dashboard de Ciberseguridad.
+    Retorna métricas clave (KPIs), ranking de factores de riesgo y últimas auditorías.
+    """
+    total_evaluaciones = db.query(AuditoriaIA).count()
+    if total_evaluaciones == 0:
+        return {
+            "resumen": {
+                "total_operaciones": 0,
+                "operaciones_aprobadas": 0,
+                "transacciones_interceptadas": 0,
+                "tasa_fraude_pct": 0.0,
+                "latencia_promedio_ms": 0.0
+            },
+            "ranking_variables_fraude": [],
+            "variable_mas_critica": "Sin datos aún",
+            "ultimas_auditorias": [],
+            "mensaje": "Sin datos aún"
+        }
+
+    # Conteo por nivel de decisión (Intercepción: DESAFIO_BIOMETRICO o Score >= 70%)
+    bloqueados = db.query(AuditoriaIA).filter(
+        (AuditoriaIA.decision_ia == "DESAFIO_BIOMETRICO") | 
+        (AuditoriaIA.score_obtenido >= 70.0)
+    ).count()
+    
+    aprobados = total_evaluaciones - bloqueados
+    tasa_fraude = round((bloqueados / total_evaluaciones) * 100, 2)
+
+    # Conteo de variables detonantes en transacciones interceptadas (Riesgo >= 70% o DESAFIO_BIOMETRICO)
+    fraudes = db.query(AuditoriaIA).filter(
+        (AuditoriaIA.decision_ia == "DESAFIO_BIOMETRICO") |
+        (AuditoriaIA.score_obtenido >= 70.0)
+    ).all()
+    
+    conteo_madrugada = sum(1 for f in fraudes if f.es_madrugada == 1)
+    conteo_contacto = sum(1 for f in fraudes if f.es_contacto_nuevo == 1)
+    conteo_ubicacion = sum(1 for f in fraudes if f.es_ubicacion_inusual == 1)
+    conteo_monto_alto = sum(1 for f in fraudes if f.monto_evaluado > 200.0)
+
+    # Ranking de variables más incidentes
+    denominador = max(bloqueados, 1)
+    variables_ranking = [
+        {
+            "id": "madrugada",
+            "variable": "Horario Nocturno (Madrugada)",
+            "descripcion": "Operaciones entre 00:00 y 05:00 AM",
+            "casos": conteo_madrugada,
+            "porcentaje": round((conteo_madrugada / denominador) * 100, 1)
+        },
+        {
+            "id": "contacto",
+            "variable": "Destinatario No Registrado",
+            "descripcion": "Transferencias a números sin historial previo",
+            "casos": conteo_contacto,
+            "porcentaje": round((conteo_contacto / denominador) * 100, 1)
+        },
+        {
+            "id": "monto",
+            "variable": "Monto Elevado (> S/ 200)",
+            "descripcion": "Importes por encima del umbral seguro",
+            "casos": conteo_monto_alto,
+            "porcentaje": round((conteo_monto_alto / denominador) * 100, 1)
+        },
+        {
+            "id": "ubicacion",
+            "variable": "Geolocalización Anómala / IP",
+            "descripcion": "Conexiones fuera de la zona habitual de Arequipa",
+            "casos": conteo_ubicacion,
+            "porcentaje": round((conteo_ubicacion / denominador) * 100, 1)
+        }
+    ]
+    # Ordenar de mayor a menor incidencia
+    variables_ranking.sort(key=lambda x: x["casos"], reverse=True)
+
+    # Latencia promedio del modelo (tiempo de inferencia en ms)
+    avg_latency = db.query(func.avg(AuditoriaIA.tiempo_inferencia_ms)).scalar() or 0.0
+
+    # Variable más crítica
+    var_mas_critica = variables_ranking[0]["variable"] if (variables_ranking and variables_ranking[0]["casos"] > 0) else "Ningún factor crítico predominante"
+
+    # Últimas 10 auditorías para la tabla de supervisión en vivo
+    ultimas = db.query(AuditoriaIA).order_by(AuditoriaIA.id.desc()).limit(10).all()
+    ultimas_data = []
+    for a in ultimas:
+        u_dict = a.to_dict()
+        u_dict["userName"] = a.user.name if a.user else "Usuario"
+        u_dict["userPhone"] = a.user.phone if a.user else ""
+        u_dict["esMadrugada"] = bool(a.es_madrugada)
+        u_dict["esContactoNuevo"] = bool(a.es_contacto_nuevo)
+        u_dict["esUbicacionInusual"] = bool(a.es_ubicacion_inusual)
+        ultimas_data.append(u_dict)
+
+    return {
+        "resumen": {
+            "total_operaciones": total_evaluaciones,
+            "operaciones_aprobadas": aprobados,
+            "transacciones_interceptadas": bloqueados,
+            "tasa_fraude_pct": tasa_fraude,
+            "latencia_promedio_ms": round(float(avg_latency), 2)
+        },
+        "ranking_variables_fraude": variables_ranking,
+        "variable_mas_critica": var_mas_critica,
+        "ultimas_auditorias": ultimas_data
+    }
+
+
 @app.get("/api/v1/auditoria")
 def get_audit_logs(limit: int = 15, db: Session = Depends(get_db)):
     """Retorna los registros de auditoría de inferencia del modelo de Machine Learning."""
@@ -866,4 +1003,260 @@ def get_user_contacts(phone: str, db: Session = Depends(get_db)):
     return {
         "user": user.name,
         "contacts": [c.to_dict() for c in contacts]
+    }
+
+
+# ---------------------------------------------------------------------------
+# Módulo de Ciberseguridad: Biometría Facial 3D y Embeddings (Google MediaPipe)
+# ---------------------------------------------------------------------------
+def compute_cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+    """
+    Calcula la Similitud del Coseno entre dos vectores biométricos.
+    Fórmula: cos(theta) = (A . B) / (||A||_2 * ||B||_2)
+    Retorna un valor acotado en el rango [0.0, 1.0].
+    """
+    try:
+        a = np.array(vec_a, dtype=np.float64)
+        b = np.array(vec_b, dtype=np.float64)
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
+        if norm_a == 0.0 or norm_b == 0.0:
+            return 0.0
+        cos_sim = np.dot(a, b) / (norm_a * norm_b)
+        return float(max(0.0, min(1.0, cos_sim)))
+    except Exception as e:
+        print(f"[WARN] Error al calcular similitud de coseno: {e}")
+        return 0.0
+
+
+@app.post("/api/v1/biometria/enrolar")
+@app.post("/api/v1/auth/enroll-face")
+def enroll_facial_biometrics(payload: EnrollBiometricsRequest, db: Session = Depends(get_db)):
+    """
+    Enrolamiento biométrico 1:1.
+    Almacena en MySQL el vector de 128 flotantes extraído por Google MediaPipe.
+    Cumple con la Ley 29733: No se almacena imagen gráfica, solo la firma vectorial irreversible.
+    """
+    user = db.query(User).filter(User.phone == payload.phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado en GuardianPay.")
+
+    if not payload.embedding or len(payload.embedding) < 64:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Vector biométrico inválido. Se requieren al menos 64 dimensiones (recibidas: {len(payload.embedding) if payload.embedding else 0})."
+        )
+
+    try:
+        # Serialización segura a JSON string
+        user.embedding_facial = json.dumps([round(float(x), 6) for x in payload.embedding])
+        user.biometria_activa = True
+        user.fecha_enrolamiento = datetime.utcnow()
+        db.commit()
+        db.refresh(user)
+
+        print(f"\n[BIOMETRÍA 3D] Rostro enrolado con éxito para: {user.name} ({user.phone})")
+        print(f"               Dimensiones almacenadas: {len(payload.embedding)} | Fuente: {payload.source}\n")
+
+        return {
+            "success": True,
+            "message": f"Biometría facial 3D enrolada exitosamente para {user.name}.",
+            "phone": user.phone,
+            "dimensions": len(payload.embedding),
+            "enrolled_at": user.fecha_enrolamiento.strftime("%Y-%m-%d %H:%M:%S") if user.fecha_enrolamiento else None,
+            "vector_preview": [round(float(x), 4) for x in payload.embedding[:4]],
+            "biometria_activa": True
+        }
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al persistir el vector biométrico: {str(err)}")
+
+
+@app.post("/api/v1/biometria/verificar")
+@app.post("/api/v1/auth/verify-face")
+def verify_facial_biometrics(payload: VerifyBiometricsRequest, db: Session = Depends(get_db)):
+    """
+    Verificación biométrica en vivo ante intercepción de fraude (Step-Up 2FA).
+    Compara el vector en vivo frente a la WebCam contra el vector enrolado en MySQL.
+    """
+    user = db.query(User).filter(User.phone == payload.phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if not user.embedding_facial or not user.biometria_activa:
+        raise HTTPException(
+            status_code=400,
+            detail="El usuario no tiene una biometría facial registrada. Debe realizar el enrolamiento primero."
+        )
+
+    try:
+        vector_guardado = json.loads(user.embedding_facial)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error de lectura del vector biométrico registrado en MySQL.")
+
+    # 0. Validar si la cuenta está previamente congelada por 24 horas
+    if user.cuenta_bloqueada:
+        if user.bloqueada_hasta and datetime.utcnow() < user.bloqueada_hasta:
+            horas_restantes = round((user.bloqueada_hasta - datetime.utcnow()).total_seconds() / 3600, 1)
+            return {
+                "success": False,
+                "verified": False,
+                "account_frozen": True,
+                "frozen_until": user.bloqueada_hasta.isoformat(),
+                "failed_attempts": 3,
+                "consecutive_blocked_txs": user.bloqueos_transaccion_consecutivos,
+                "similarity": 0.0,
+                "similarity_pct": 0.0,
+                "message": f"🚨 CUENTA CONGELADA POR 24 HORAS: Se bloquearon 3 transacciones por biometría. Restan aprox. {horas_restantes} horas de bloqueo.",
+                "user_name": user.name,
+                "phone": user.phone
+            }
+        else:
+            # Ventana de 24 horas completada: descongelar automáticamente
+            user.cuenta_bloqueada = False
+            user.bloqueada_hasta = None
+            user.bloqueos_transaccion_consecutivos = 0
+            user.intentos_fallidos_biometria = 0
+            db.commit()
+
+    # Cálculo matemático de Similitud del Coseno
+    similarity = compute_cosine_similarity(vector_guardado, payload.embedding)
+    threshold = float(payload.threshold or 0.85)
+    is_verified = bool(similarity >= threshold)
+
+    if similarity >= 0.93:
+        match_quality = "EXCELENTE"
+    elif similarity >= threshold:
+        match_quality = "ALTA_COINCIDENCIA"
+    elif similarity >= 0.70:
+        match_quality = "DUDOSA_BAJA"
+    else:
+        match_quality = "RECHAZADA_NO_COINCIDE"
+
+    transaction_blocked = False
+    account_frozen = False
+    frozen_until = None
+
+    if is_verified:
+        # Éxito: Reiniciar los contadores de fallos
+        user.intentos_fallidos_biometria = 0
+        user.bloqueos_transaccion_consecutivos = 0
+        db.commit()
+        db.refresh(user)
+    else:
+        # Fallo de cotejo: Incrementar contador de intentos en la transacción actual
+        current_attempts = (user.intentos_fallidos_biometria or 0) + 1
+        user.intentos_fallidos_biometria = current_attempts
+
+        if current_attempts >= 3:
+            # Regla 1: Al tercer intento fallido, se bloquea la transacción
+            transaction_blocked = True
+            user.intentos_fallidos_biometria = 0  # Reiniciar contador de intentos para próximas transacciones
+            new_consecutive_blocks = (user.bloqueos_transaccion_consecutivos or 0) + 1
+            user.bloqueos_transaccion_consecutivos = new_consecutive_blocks
+
+            # Registro de auditoría bancaria de transacción bloqueada por biometría
+            blocked_audit = AuditoriaIA(
+                user_id=user.id,
+                operation_code=f"BLOQ-BIO-{int(datetime.utcnow().timestamp())}",
+                monto_evaluado=0.0,
+                hora_transaccion=datetime.utcnow().strftime("%H:%M"),
+                es_madrugada=0,
+                es_contacto_nuevo=1,
+                es_ubicacion_inusual=1,
+                score_obtenido=100.0,
+                nivel_riesgo="CRÍTICO",
+                decision_ia="TRANSACCION_BLOQUEADA_BIOMETRIA",
+                tiempo_inferencia_ms=1.5
+            )
+            db.add(blocked_audit)
+
+            # Regla 2: Si se acumulan 3 transacciones bloqueadas por biometría -> Congelar 24 horas
+            if new_consecutive_blocks >= 3:
+                user.cuenta_bloqueada = True
+                user.bloqueada_hasta = datetime.utcnow() + timedelta(hours=24)
+                account_frozen = True
+                frozen_until = user.bloqueada_hasta.isoformat()
+
+        db.commit()
+        db.refresh(user)
+
+    print(f"\n[BIOMETRÍA 3D] Cotejo Facial para {user.name} ({user.phone}):")
+    print(f"               Similitud: {similarity * 100:.2f}% | Umbral: {threshold * 100:.2f}% | Veredicto: {'APROBADO' if is_verified else 'RECHAZADO'}")
+    if not is_verified:
+        print(f"               Intentos Fallidos Tx: {user.intentos_fallidos_biometria}/3 | Tx Bloqueadas Acumuladas: {user.bloqueos_transaccion_consecutivos}/3 | Congelada: {user.cuenta_bloqueada}")
+
+    # Mensaje adaptativo según el nivel de severidad
+    if is_verified:
+        msg = "Identidad biométrica verificada exitosamente."
+    elif account_frozen:
+        msg = "🚨 CUENTA CONGELADA POR 24 HORAS: Se acumularon 3 transacciones bloqueadas por fallos biométricos."
+    elif transaction_blocked:
+        msg = f"Transacción bloqueada: 3 intentos biométricos fallidos (Bloqueos acumulados: {user.bloqueos_transaccion_consecutivos}/3)."
+    else:
+        msg = f"Rostro no coincide con el titular (Intento {user.intentos_fallidos_biometria} de 3)."
+
+    return {
+        "success": True,
+        "verified": is_verified,
+        "similarity": round(similarity, 4),
+        "similarity_pct": round(similarity * 100, 2),
+        "threshold": round(threshold * 100, 2),
+        "match_quality": match_quality,
+        "failed_attempts": user.intentos_fallidos_biometria,
+        "transaction_blocked": transaction_blocked,
+        "consecutive_blocked_txs": user.bloqueos_transaccion_consecutivos,
+        "account_frozen": bool(user.cuenta_bloqueada),
+        "frozen_until": frozen_until or (user.bloqueada_hasta.isoformat() if user.bloqueada_hasta else None),
+        "message": msg,
+        "user_name": user.name,
+        "phone": user.phone,
+        "stored_enrolled_at": user.fecha_enrolamiento.strftime("%Y-%m-%d %H:%M:%S") if user.fecha_enrolamiento else None,
+        "vector_dimensions": len(vector_guardado),
+        "vector_preview": [round(x, 4) for x in vector_guardado[:4]]
+    }
+
+
+@app.post("/api/v1/auth/unblock-account/{phone}")
+@app.post("/api/v1/biometria/desbloquear/{phone}")
+def unblock_user_account(phone: str, db: Session = Depends(get_db)):
+    """
+    Restaura y desbloquea la cuenta del usuario para propósitos de pruebas y sustentación académica.
+    Reinicia los intentos fallidos, bloqueos consecutivos y levanta el congelamiento de 24 horas.
+    """
+    user = db.query(User).filter(User.phone == phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    user.intentos_fallidos_biometria = 0
+    user.bloqueos_transaccion_consecutivos = 0
+    user.cuenta_bloqueada = False
+    user.bloqueada_hasta = None
+    db.commit()
+    db.refresh(user)
+
+    print(f"\n[SEGURIDAD] Cuenta desbloqueada para pruebas: {user.name} ({user.phone})")
+
+    return {
+        "success": True,
+        "message": f"Cuenta de {user.name} desbloqueada exitosamente. Intentos biométricos y congelamiento reiniciados a 0.",
+        "user": user.to_dict()
+    }
+
+
+@app.get("/api/v1/biometria/estado/{phone}")
+@app.get("/api/v1/auth/biometric-status/{phone}")
+def get_biometric_status(phone: str, db: Session = Depends(get_db)):
+    """Consulta el estado del registro biométrico de un usuario."""
+    user = db.query(User).filter(User.phone == phone.strip()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    has_bio = bool(user.biometria_activa and user.embedding_facial)
+    return {
+        "phone": user.phone,
+        "name": user.name,
+        "has_biometrics": has_bio,
+        "biometria_activa": user.biometria_activa,
+        "enrolled_at": user.fecha_enrolamiento.isoformat() if user.fecha_enrolamiento else None
     }

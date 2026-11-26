@@ -1,1 +1,1 @@
-# GuardianPay AI Backend Services Package
+# Paquete de servicios auxiliares de GuardianPay

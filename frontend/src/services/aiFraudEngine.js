@@ -300,7 +300,7 @@ export async function buscarDestinatarioAPI(phone, senderPhone) {
 
   try {
     const res = await axios.get(`${API_BASE_URL}/api/v1/usuarios/lookup`, {
-      params: {
+      params: { 
         phone: cleanPhone,
         sender_phone: senderPhone || undefined
       },
@@ -505,7 +505,8 @@ export async function registrarUsuarioAPI({
   pin,
   birthDate = "1998-05-15",
   email = "",
-  initialBalance = 500.0
+  initialBalance = 500.0,
+  embedding = null
 }) {
   try {
     const res = await axios.post(`${API_BASE_URL}/api/v1/auth/register`, {
@@ -515,7 +516,8 @@ export async function registrarUsuarioAPI({
       pin,
       birth_date: birthDate,
       email,
-      initial_balance: parseFloat(initialBalance) || 500.0
+      initial_balance: parseFloat(initialBalance) || 500.0,
+      embedding: embedding || null
     }, {
       timeout: 4000,
       headers: { 'Content-Type': 'application/json' }
@@ -532,3 +534,217 @@ export async function registrarUsuarioAPI({
   }
 }
 
+
+
+/**
+ * Enrolar vector biométrico 128D en MySQL para un usuario (POST /api/v1/biometria/enrolar)
+ */
+export async function enrolarBiometriaAPI(phone, embedding, source = "GOOGLE_MEDIAPIPE_3D") {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/api/v1/biometria/enrolar`, {
+      phone,
+      embedding,
+      source
+    }, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response && error.response.data) {
+      return {
+        success: false,
+        error: error.response.data.detail || 'Error al enrolar biometría en el servidor.'
+      };
+    }
+    return {
+      success: false,
+      error: 'Error de conexión con el servicio biométrico.'
+    };
+  }
+}
+
+/**
+ * Cotejo biométrico 1:1 en vivo frente a la WebCam (POST /api/v1/biometria/verificar)
+ */
+export async function verificarBiometriaAPI(phone, embedding, threshold = 0.85) {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/api/v1/biometria/verificar`, {
+      phone,
+      embedding,
+      threshold
+    }, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response && error.response.data) {
+      return {
+        success: false,
+        verified: false,
+        error: error.response.data.detail || 'Error al verificar biometría facial.'
+      };
+    }
+    return {
+      success: false,
+      verified: false,
+      error: 'No se pudo conectar con el motor biométrico del backend.'
+    };
+  }
+}
+
+/**
+ * Consulta de estado biométrico de un usuario (GET /api/v1/biometria/estado/{phone})
+ */
+export async function obtenerEstadoBiometriaAPI(phone) {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/v1/biometria/estado/${encodeURIComponent(phone)}`, {
+      timeout: 3000
+    });
+    return res.data;
+  } catch (error) {
+    return {
+      phone,
+      has_biometrics: false,
+      biometria_activa: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Desbloqueo y reseteo de seguridad de cuenta (POST /api/v1/auth/unblock-account/{phone})
+ * Modo de pruebas: reinicia intentos biométricos fallidos y levanta congelamiento de 24 horas.
+ */
+export async function desbloquearCuentaAPI(phone) {
+  try {
+    const res = await axios.post(`${API_BASE_URL}/api/v1/auth/unblock-account/${encodeURIComponent(phone)}`, {}, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  } catch (error) {
+    if (error.response && error.response.data) {
+      return {
+        success: false,
+        error: error.response.data.detail || 'Error al desbloquear cuenta.'
+      };
+    }
+    return {
+      success: false,
+      error: 'No se pudo conectar con el servidor para desbloquear la cuenta.'
+    };
+  }
+}
+
+/**
+ * Obtener estadísticas globales de auditoría de IA para el Dashboard (GET /api/v1/dashboard/stats)
+ */
+export async function obtenerEstadisticasDashboardAPI() {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/v1/dashboard/stats`, {
+      timeout: 4000
+    });
+    return {
+      success: true,
+      data: res.data
+    };
+  } catch (error) {
+    console.warn("No se pudo obtener estadísticas del backend, usando datos analíticos de respaldo:", error);
+    return {
+      success: false,
+      isFallback: true,
+      data: {
+        resumen: {
+          total_operaciones: 55,
+          operaciones_aprobadas: 42,
+          transacciones_interceptadas: 13,
+          tasa_fraude_pct: 23.64,
+          latencia_promedio_ms: 18.45
+        },
+        ranking_variables_fraude: [
+          {
+            id: "madrugada",
+            variable: "Horario Nocturno (Madrugada)",
+            descripcion: "Operaciones entre 00:00 y 05:00 AM",
+            casos: 11,
+            porcentaje: 84.6
+          },
+          {
+            id: "monto",
+            variable: "Monto Elevado (> S/ 200)",
+            descripcion: "Importes por encima del umbral seguro",
+            casos: 9,
+            porcentaje: 69.2
+          },
+          {
+            id: "contacto",
+            variable: "Destinatario No Registrado",
+            descripcion: "Transferencias a números sin historial previo",
+            casos: 7,
+            porcentaje: 53.8
+          },
+          {
+            id: "ubicacion",
+            variable: "Geolocalización Anómala / IP",
+            descripcion: "Conexiones fuera de la zona habitual de Arequipa",
+            casos: 4,
+            porcentaje: 30.8
+          }
+        ],
+        variable_mas_critica: "Horario Nocturno (Madrugada)",
+        ultimas_auditorias: [
+          {
+            id: 55,
+            operationCode: "BLOQUEADO-BIOMETRIA",
+            userName: "Anthony Luque",
+            userPhone: "987654321",
+            monto: 25.0,
+            hora: "14:30",
+            score: 84.0,
+            nivelRiesgo: "CRÍTICO",
+            decision: "DESAFIO_BIOMETRICO",
+            tiempoMs: 19.2,
+            esMadrugada: false,
+            esContactoNuevo: true,
+            esUbicacionInusual: false,
+            createdAt: "Hoy, 14:30"
+          },
+          {
+            id: 54,
+            operationCode: "OP-38709393",
+            userName: "Anthony Luque",
+            userPhone: "987654321",
+            monto: 450.0,
+            hora: "03:45 AM",
+            score: 87.9,
+            nivelRiesgo: "CRÍTICO",
+            decision: "DESAFIO_BIOMETRICO",
+            tiempoMs: 22.4,
+            esMadrugada: true,
+            esContactoNuevo: true,
+            esUbicacionInusual: true,
+            createdAt: "Hoy, 03:45"
+          },
+          {
+            id: 53,
+            operationCode: "OP-30889604",
+            userName: "Carlos Mendoza",
+            userPhone: "971889922",
+            monto: 30.0,
+            hora: "15:20",
+            score: 4.2,
+            nivelRiesgo: "BAJO",
+            decision: "APROBADO",
+            tiempoMs: 14.1,
+            esMadrugada: false,
+            esContactoNuevo: false,
+            esUbicacionInusual: false,
+            createdAt: "Hoy, 15:20"
+          }
+        ]
+      }
+    };
+  }
+}

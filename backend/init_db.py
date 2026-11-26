@@ -1,30 +1,57 @@
+from sqlalchemy import text
 from database import engine, Base, SessionLocal
 from models import User, Transaction
-from sqlalchemy import text
+
+def asegurar_columnas_biometria():
+    """Verifica y añade automáticamente las columnas de biometría en MySQL si faltan."""
+    if engine.dialect.name != "mysql":
+        return
+    columnas = [
+        ("embedding_facial", "TEXT NULL COMMENT 'Vector biométrico 128D serializado en JSON'"),
+        ("biometria_activa", "TINYINT(1) DEFAULT 0 NOT NULL COMMENT 'Flag 1 si tiene rostro registrado'"),
+        ("fecha_enrolamiento", "DATETIME NULL COMMENT 'Fecha y hora en que se enroló el rostro'"),
+        ("intentos_fallidos_biometria", "INT DEFAULT 0 NOT NULL COMMENT 'Intentos biométricos fallidos en la tx actual'"),
+        ("bloqueos_transaccion_consecutivos", "INT DEFAULT 0 NOT NULL COMMENT 'Transacciones bloqueadas por biometría'"),
+        ("cuenta_bloqueada", "TINYINT(1) DEFAULT 0 NOT NULL COMMENT '1 si está congelada 24h'"),
+        ("bloqueada_hasta", "DATETIME NULL COMMENT 'Fin del congelamiento temporal'")
+    ]
+    try:
+        with engine.begin() as conn:
+            for nombre_col, definicion in columnas:
+                try:
+                    conn.execute(text(f"ALTER TABLE `usuarios` ADD COLUMN `{nombre_col}` {definicion};"))
+                    print(f"[OK] Columna '{nombre_col}' añadida automáticamente a 'usuarios'.")
+                except Exception:
+                    # Si ya existe o da duplicate column, continúa sin bloquear
+                    pass
+    except Exception as ex:
+        print(f"[INFO] Verificación de columnas de biometría: {ex}")
+
+def asegurar_columnas_geo():
+    """Verifica y añade automáticamente las columnas de geolocalización (Incremento 3) en transferencias."""
+    if engine.dialect.name != "mysql":
+        return
+    columnas_geo = [
+        ("latitude", "DOUBLE NULL COMMENT 'Latitud real o simulada de la transacción'"),
+        ("longitude", "DOUBLE NULL COMMENT 'Longitud real o simulada de la transacción'"),
+        ("ip_address", "VARCHAR(45) NULL COMMENT 'Dirección IP del cliente'")
+    ]
+    try:
+        with engine.begin() as conn:
+            for nombre_col, definicion in columnas_geo:
+                try:
+                    conn.execute(text(f"ALTER TABLE `transferencias` ADD COLUMN `{nombre_col}` {definicion};"))
+                    print(f"[OK] Columna '{nombre_col}' añadida automáticamente a 'transferencias'.")
+                except Exception:
+                    pass
+    except Exception as ex:
+        print(f"[INFO] Verificación de columnas geo: {ex}")
 
 def init_db():
     print("[INFO] Creando tablas en MySQL guardianpay_db...")
     Base.metadata.create_all(bind=engine)
-    
-    # Migración segura de columnas geográficas (Incremento 3)
-    try:
-        with engine.connect() as conn:
-            # Comprobar columnas existentes en transferencias
-            result = conn.execute(text("SHOW COLUMNS FROM transferencias"))
-            columns = [row[0] for row in result.fetchall()]
-            
-            if "latitude" not in columns:
-                conn.execute(text("ALTER TABLE transferencias ADD COLUMN latitude FLOAT NULL DEFAULT -16.409047;"))
-                print("[INFO] Columna 'latitude' agregada a tabla 'transferencias'.")
-            if "longitude" not in columns:
-                conn.execute(text("ALTER TABLE transferencias ADD COLUMN longitude FLOAT NULL DEFAULT -71.537451;"))
-                print("[INFO] Columna 'longitude' agregada a tabla 'transferencias'.")
-            if "ip_address" not in columns:
-                conn.execute(text("ALTER TABLE transferencias ADD COLUMN ip_address VARCHAR(45) NULL DEFAULT '127.0.0.1';"))
-                print("[INFO] Columna 'ip_address' agregada a tabla 'transferencias'.")
-            conn.commit()
-    except Exception as col_err:
-        print(f"[WARN] Verificación de columnas geográficas en transferencias: {col_err}")
+    asegurar_columnas_biometria()
+    asegurar_columnas_geo()
     
     db = SessionLocal()
     try:
@@ -38,7 +65,7 @@ def init_db():
                     birth_date="1999-08-24",
                     email="anthony.luque@guardianpay.pe",
                     pin="123456",
-                    balance=1450.0,
+                    balance=1000000.0,
                     account_number="193-482910-0-21",
                     avatar="AL"
                 ),

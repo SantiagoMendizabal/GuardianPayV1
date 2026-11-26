@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -16,6 +16,13 @@ class User(Base):
     balance = Column(Float, nullable=False, default=1500.0)
     account_number = Column(String(30), unique=True, nullable=False)
     avatar = Column(String(4), default="AL")
+    embedding_facial = Column(Text, nullable=True)  # Vector biométrico 128D serializado en JSON
+    biometria_activa = Column(Boolean, default=False, nullable=False)
+    fecha_enrolamiento = Column(DateTime, nullable=True)
+    intentos_fallidos_biometria = Column(Integer, default=0, nullable=False)
+    bloqueos_transaccion_consecutivos = Column(Integer, default=0, nullable=False)
+    cuenta_bloqueada = Column(Boolean, default=False, nullable=False)
+    bloqueada_hasta = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relaciones de transacciones
@@ -33,7 +40,14 @@ class User(Base):
             "email": self.email,
             "balance": round(self.balance, 2),
             "accountNumber": self.account_number,
-            "avatar": self.avatar
+            "avatar": self.avatar,
+            "hasBiometrics": bool(self.biometria_activa and self.embedding_facial),
+            "biometriaActiva": bool(self.biometria_activa),
+            "fechaEnrolamiento": self.fecha_enrolamiento.isoformat() if self.fecha_enrolamiento else None,
+            "intentosFallidosBiometria": self.intentos_fallidos_biometria or 0,
+            "bloqueosConsecutivos": self.bloqueos_transaccion_consecutivos or 0,
+            "cuentaBloqueada": bool(self.cuenta_bloqueada),
+            "bloqueadaHasta": self.bloqueada_hasta.isoformat() if self.bloqueada_hasta else None
         }
 
 # Alias en español para el modelo
@@ -50,9 +64,9 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     time_str = Column(String(20), nullable=False)
     location_str = Column(String(60), default="Arequipa")
-    latitude = Column(Float, nullable=True, default=-16.409047)
-    longitude = Column(Float, nullable=True, default=-71.537451)
-    ip_address = Column(String(45), nullable=True, default="127.0.0.1")
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    ip_address = Column(String(45), nullable=True)
     is_frequent_contact = Column(Boolean, default=True)
     risk_score = Column(Float, nullable=False)
     risk_level = Column(String(20), nullable=False)
@@ -79,9 +93,9 @@ class Transaction(Base):
             "recipientPhone": counterpart.phone if counterpart else "",
             "date": f"Hoy, {self.time_str.replace(' AM', '').replace(' PM', '')}",
             "location": self.location_str,
-            "latitude": self.latitude if getattr(self, "latitude", None) is not None else -16.409047,
-            "longitude": self.longitude if getattr(self, "longitude", None) is not None else -71.537451,
-            "ipAddress": getattr(self, "ip_address", "127.0.0.1") or "127.0.0.1",
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "ipAddress": self.ip_address,
             "riskScore": self.risk_score,
             "riskLevel": self.risk_level,
             "status": self.status.lower(),

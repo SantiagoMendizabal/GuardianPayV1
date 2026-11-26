@@ -25,15 +25,13 @@ import {
   GitBranch,
   ExternalLink,
   Navigation,
-  Globe,
-  Radio,
   Crosshair,
   Compass
 } from 'lucide-react';
 import { FREQUENT_CONTACTS } from '../data/mockData';
 import { calcularRiesgoIA, buscarDestinatarioAPI, obtenerGeoActualAPI } from '../services/aiFraudEngine';
 
-// Catálogo de Nodos de Ubicación para Selector Híbrido (Incremento 3)
+// Catálogo de Nodos Híbridos de Geolocalización (Incremento 3)
 const SIMULATION_NODES = {
   REAL: {
     id: 'REAL',
@@ -42,18 +40,16 @@ const SIMULATION_NODES = {
     lat: -16.409047,
     lng: -71.537451,
     city: 'Arequipa',
-    country: 'Perú',
-    description: 'IP pública en Azure o GPS navegador'
+    country: 'Perú'
   },
   LA_JOYA: {
     id: 'LA_JOYA',
     name: 'Otro Distrito (+25 km - La Joya/Yura)',
-    shortName: 'Otro Distrito (+25 km)',
+    shortName: 'La Joya (+25 km)',
     lat: -16.592500,
     lng: -71.916700,
     city: 'La Joya',
-    country: 'Perú',
-    description: 'Salto interurbano > 20 km en Arequipa'
+    country: 'Perú'
   },
   LIMA: {
     id: 'LIMA',
@@ -62,8 +58,7 @@ const SIMULATION_NODES = {
     lat: -12.046374,
     lng: -77.042793,
     city: 'Lima',
-    country: 'Perú',
-    description: 'Salto interdepartamental a Lima'
+    country: 'Perú'
   },
   MIAMI: {
     id: 'MIAMI',
@@ -72,8 +67,7 @@ const SIMULATION_NODES = {
     lat: 25.761681,
     lng: -80.191788,
     city: 'Miami',
-    country: 'Estados Unidos',
-    description: 'Ataque de suplantación con Proxy/VPN'
+    country: 'Estados Unidos'
   }
 };
 
@@ -100,9 +94,9 @@ export default function TransferScreen({
   // Panel de pruebas para demostración (colapsado por defecto para vista 100% real)
   const [isDemoPanelOpen, setIsDemoPanelOpen] = useState(false);
   const [selectedTime, setSelectedTime] = useState('14:30'); // '14:30' | '03:45 AM'
-  
-  // Selector Híbrido de Geolocalización (Incremento 3 - Jonathan Amanca)
-  const [selectedNodeKey, setSelectedNodeKey] = useState('REAL'); // 'REAL' | 'LA_JOYA' | 'LIMA' | 'MIAMI'
+
+  // Selector Híbrido de Geolocalización (Incremento 3)
+  const [selectedNodeKey, setSelectedNodeKey] = useState('REAL');
   const [detectedGeo, setDetectedGeo] = useState({
     ip: '127.0.0.1',
     city: 'Arequipa',
@@ -115,10 +109,10 @@ export default function TransferScreen({
   });
   const [isDetectingGps, setIsDetectingGps] = useState(false);
   const [gpsStatus, setGpsStatus] = useState('');
-  
+
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Paso 1: Consultar la IP real y geolocalización al cargar el formulario
+  // Paso 1: Consultar IP real y GeoIP al montar
   useEffect(() => {
     let isMounted = true;
     obtenerGeoActualAPI().then((res) => {
@@ -139,7 +133,6 @@ export default function TransferScreen({
     return () => { isMounted = false; };
   }, []);
 
-  // Función para solicitar permiso de GPS satelital HTML5
   const handleRequestGps = () => {
     if (!navigator.geolocation) {
       setGpsStatus('Navegador sin soporte de geolocalización.');
@@ -162,14 +155,13 @@ export default function TransferScreen({
       },
       (err) => {
         setIsDetectingGps(false);
-        setGpsStatus('GPS no disponible en HTTP (usa coordenadas base GeoIP)');
+        setGpsStatus('GPS no disponible (usa GeoIP base)');
         console.warn('GPS permiso denegado:', err.message);
       },
       { timeout: 8000, enableHighAccuracy: true }
     );
   };
 
-  // Coordenadas activas calculadas
   const currentNode = SIMULATION_NODES[selectedNodeKey] || SIMULATION_NODES.REAL;
   const activeLat = selectedNodeKey === 'REAL' ? detectedGeo.lat : currentNode.lat;
   const activeLng = selectedNodeKey === 'REAL' ? detectedGeo.lng : currentNode.lng;
@@ -239,7 +231,7 @@ export default function TransferScreen({
         isGps: selectedNodeKey === 'REAL' && detectedGeo.isGps
       });
     }
-  }, [amount, selectedTime, isFrequentContact, activeLocationStr, activeLat, activeLng, detectedGeo.ip, selectedNodeKey, onInputChange]);
+  }, [amount, selectedTime, isFrequentContact, activeLocationStr, activeLat, activeLng, detectedGeo.ip, selectedNodeKey, detectedGeo.isGps, onInputChange]);
 
   const fallbackUserAvg = user?.phone === '971889922' ? 30.0 : (user?.phone === '987654321' ? 118.04 : 80.0);
   const userAvg = typeof user?.avg_monto === 'number' && user.avg_monto > 0 ? user.avg_monto : fallbackUserAvg;
@@ -281,11 +273,11 @@ export default function TransferScreen({
     setAmount('150.00');
     setRecipientPhone('981234567');
     setSelectedTime('14:32');
-    setSelectedNodeKey('LA_JOYA'); // Salto de 25 km en 1 minuto = 1,500 km/h
+    setSelectedNodeKey('LA_JOYA');
     setErrorMsg('');
   };
 
-  // Atajo: Cargar Escenario de Fraude Crítico
+  // Atajo: Cargar Escenario de Fraude
   const handleLoadFraudScenario = () => {
     setAmount('480.00');
     setRecipientPhone('970203193'); // Número no registrado (nuevo contacto)
@@ -297,6 +289,11 @@ export default function TransferScreen({
   const handleSubmit = (e) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
+
+    if (user?.cuentaBloqueada) {
+      setErrorMsg('🚨 Tu cuenta está congelada temporalmente por 24 horas debido a 3 transacciones con fallos biométricos. Usa el botón "Desbloquear Cuenta" en la barra superior para continuar tus pruebas.');
+      return;
+    }
 
     if (!recipientPhone || recipientPhone.length < 9) {
       setErrorMsg('Ingresa un número celular válido de 9 dígitos.');
@@ -578,106 +575,49 @@ export default function TransferScreen({
               </button>
 
               {isDemoPanelOpen && (
-                <div className="bg-slate-900 text-white p-3.5 rounded-xl space-y-3 text-xs">
-                  {/* Selector de Horario */}
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Horario Transaccional:</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTime('14:30')}
-                        className={`p-2 rounded-lg font-bold border text-[11px] ${selectedTime === '14:30' ? 'bg-yape-700 border-mint text-white' : 'bg-white/5 border-white/10 text-slate-300'}`}
-                      >
-                        ☀️ Día (14:30)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTime('03:45 AM')}
-                        className={`p-2 rounded-lg font-bold border text-[11px] ${selectedTime === '03:45 AM' ? 'bg-red-900 border-red-500 text-red-200' : 'bg-white/5 border-white/10 text-slate-300'}`}
-                      >
-                        🌙 Madrugada (03:45 AM)
-                      </button>
-                    </div>
+                <div className="bg-slate-900 text-white p-3 rounded-xl space-y-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTime('14:30')}
+                      className={`p-2 rounded-lg font-bold border text-[11px] ${selectedTime === '14:30' ? 'bg-yape-700 border-mint text-white' : 'bg-white/5 border-white/10'}`}
+                    >
+                      ☀️ Día (14:30)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTime('03:45 AM')}
+                      className={`p-2 rounded-lg font-bold border text-[11px] ${selectedTime === '03:45 AM' ? 'bg-red-900 border-red-500 text-red-200' : 'bg-white/5 border-white/10'}`}
+                    >
+                      🌙 Madrugada (03:45 AM)
+                    </button>
                   </div>
-
-                  {/* Selector Híbrido de Ubicación / IP (Incremento 3) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Ubicación / IP Real & Simulación:</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.values(SIMULATION_NODES).map((node) => (
                       <button
+                        key={node.id}
                         type="button"
-                        onClick={handleRequestGps}
-                        disabled={isDetectingGps}
-                        className="text-[10px] text-mint font-bold flex items-center gap-1 hover:underline cursor-pointer"
-                      >
-                        <Crosshair className="w-3 h-3 text-mint" />
-                        <span>{isDetectingGps ? 'Buscando GPS...' : 'Activar GPS'}</span>
-                      </button>
-                    </div>
-
-                    {/* Telemetría rápida de IP detectada */}
-                    <div className="p-2 rounded-lg bg-black/40 border border-white/10 mb-2 font-mono text-[10px] text-slate-300 flex items-center justify-between">
-                      <span className="truncate">IP: <b className="text-white">{detectedGeo.ip}</b> ({detectedGeo.city})</span>
-                      <span className="text-amber-400 font-bold shrink-0 ml-1">
-                        {detectedGeo.isGps ? '🛰️ GPS' : (detectedGeo.ip === '127.0.0.1' ? '💻 Local' : '🌐 Pública')}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedNodeKey('REAL')}
-                        className={`p-2 rounded-lg font-bold border text-[10px] text-left transition-all ${
-                          selectedNodeKey === 'REAL' ? 'bg-yape-700 border-mint text-white' : 'bg-white/5 border-white/10 text-slate-300'
+                        onClick={() => setSelectedNodeKey(node.id)}
+                        className={`p-2 rounded-lg font-bold border text-[11px] ${
+                          selectedNodeKey === node.id
+                            ? node.id === 'REAL'
+                              ? 'bg-yape-700 border-mint text-white'
+                              : 'bg-red-900 border-red-500 text-red-200'
+                            : 'bg-white/5 border-white/10 text-slate-300'
                         }`}
                       >
-                        <div>📍 Real Detectada</div>
-                        <div className="text-[9px] font-normal opacity-80">{detectedGeo.city}</div>
+                        {node.id === 'REAL' ? '📍' : '🌐'} {node.shortName}
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedNodeKey('LA_JOYA')}
-                        className={`p-2 rounded-lg font-bold border text-[10px] text-left transition-all ${
-                          selectedNodeKey === 'LA_JOYA' ? 'bg-amber-900/80 border-amber-400 text-amber-200' : 'bg-white/5 border-white/10 text-slate-300'
-                        }`}
-                      >
-                        <div>🚨 Otro Distrito</div>
-                        <div className="text-[9px] font-normal opacity-80">+25 km (La Joya)</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedNodeKey('LIMA')}
-                        className={`p-2 rounded-lg font-bold border text-[10px] text-left transition-all ${
-                          selectedNodeKey === 'LIMA' ? 'bg-orange-900/80 border-orange-400 text-orange-200' : 'bg-white/5 border-white/10 text-slate-300'
-                        }`}
-                      >
-                        <div>🚨 Lima (+1,010 km)</div>
-                        <div className="text-[9px] font-normal opacity-80">Salto Nacional</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedNodeKey('MIAMI')}
-                        className={`p-2 rounded-lg font-bold border text-[10px] text-left transition-all ${
-                          selectedNodeKey === 'MIAMI' ? 'bg-red-900/80 border-red-500 text-red-200' : 'bg-white/5 border-white/10 text-slate-300'
-                        }`}
-                      >
-                        <div>🌐 Miami (+4,500 km)</div>
-                        <div className="text-[9px] font-normal opacity-80">VPN Extranjera</div>
-                      </button>
-                    </div>
+                    ))}
                   </div>
-
-                  {/* Botón Demostración Salto Imposible para el Jurado */}
                   <button
                     type="button"
-                    onClick={handleLoadImpossibleTravelScenario}
-                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                    onClick={handleRequestGps}
+                    disabled={isDetectingGps}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-[11px] font-bold flex items-center justify-center gap-1.5"
                   >
-                    <Zap className="w-3.5 h-3.5 text-mint" />
-                    <span>Demo Salto Imposible (&gt;20 km / 1 min)</span>
+                    <Crosshair className="w-3.5 h-3.5" />
+                    <span>{isDetectingGps ? 'Detectando GPS...' : (gpsStatus || 'Activar GPS Real (HTML5)')}</span>
                   </button>
                 </div>
               )}
@@ -807,10 +747,10 @@ export default function TransferScreen({
                   <b className="font-mono">{!isFrequentContact ? '+32.8% (Nuevo)' : '0% (Frecuente)'}</b>
                 </div>
                 <div className={`p-2 rounded-xl flex items-center justify-between border ${
-                  selectedLocation !== 'Arequipa' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-50 border-slate-100 text-slate-600'
+                  isAnomalousLocation ? 'bg-red-50 border-red-200 text-red-900' : 'bg-slate-50 border-slate-100 text-slate-600'
                 }`}>
-                  <span>Geolocalización / IP</span>
-                  <b className="font-mono">{selectedLocation !== 'Arequipa' ? '+25.0%' : '0%'}</b>
+                  <span>Geolocalización / IP ({activeLocationStr})</span>
+                  <b className="font-mono">{isAnomalousLocation ? '+25.0%' : '0%'}</b>
                 </div>
               </div>
             </div>
@@ -854,109 +794,43 @@ export default function TransferScreen({
                 </div>
               </div>
 
-              {/* Panel Híbrido de Ubicación / IP (Incremento 3 - Jonathan Amanca) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] text-slate-300 font-semibold">Ubicación / IP Real & Simulación:</span>
+                  <span className="text-[11px] text-slate-300 font-semibold">Ubicación Híbrida (GeoIP / GPS / Salto):</span>
                   <button
                     type="button"
                     onClick={handleRequestGps}
                     disabled={isDetectingGps}
-                    className="text-[10px] text-mint font-bold flex items-center gap-1 hover:underline cursor-pointer bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded border border-white/10"
+                    className="text-[10px] px-2 py-0.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold flex items-center gap-1 cursor-pointer"
                   >
-                    <Crosshair className="w-3 h-3 text-mint" />
-                    <span>{isDetectingGps ? 'Buscando GPS...' : 'Activar GPS'}</span>
+                    <Crosshair className="w-3 h-3" />
+                    <span>{isDetectingGps ? 'GPS...' : 'Usar GPS'}</span>
                   </button>
                 </div>
-
-                {/* Tarjeta de Telemetría Geodésica */}
-                <div className="p-2.5 rounded-xl bg-black/50 border border-white/10 mb-2.5 font-mono text-[10px] text-slate-300 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span>IP Cliente: <b className="text-white">{detectedGeo.ip}</b></span>
-                    <span className="text-amber-400 font-bold">
-                      {detectedGeo.isGps ? '🛰️ GPS Móvil' : (detectedGeo.ip === '127.0.0.1' ? '💻 Local PE' : '🌐 Pública Azure')}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Nodo: <b className="text-slate-200">{currentNode.name}</b></span>
-                    <span>{activeLat.toFixed(4)}, {activeLng.toFixed(4)}</span>
-                  </div>
-                  {gpsStatus && (
-                    <div className="text-[9px] text-mint pt-0.5 border-t border-white/10">
-                      {gpsStatus}
-                    </div>
-                  )}
-                </div>
-
-                {/* Grid de 4 Nodos */}
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedNodeKey('REAL')}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                      selectedNodeKey === 'REAL' 
-                        ? 'bg-yape-700 border-mint text-white shadow-xs' 
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="text-xs font-bold flex items-center justify-between">
-                      <span>📍 Real Detectada</span>
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-white/20">Base</span>
-                    </div>
-                    <div className="text-[10px] opacity-80 mt-0.5">{detectedGeo.city} (IP/GPS)</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedNodeKey('LA_JOYA')}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                      selectedNodeKey === 'LA_JOYA' 
-                        ? 'bg-amber-900/80 border-amber-400 text-amber-200 shadow-xs' 
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="text-xs font-bold flex items-center justify-between">
-                      <span>🚨 Otro Distrito</span>
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-300">&gt;20 km</span>
-                    </div>
-                    <div className="text-[10px] opacity-80 mt-0.5">+25 km (La Joya/Yura)</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedNodeKey('LIMA')}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                      selectedNodeKey === 'LIMA' 
-                        ? 'bg-orange-900/80 border-orange-400 text-orange-200 shadow-xs' 
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="text-xs font-bold flex items-center justify-between">
-                      <span>🚨 Lima (+1,010 km)</span>
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-orange-500/30 text-orange-300">Región</span>
-                    </div>
-                    <div className="text-[10px] opacity-80 mt-0.5">Salto Interdepartamental</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedNodeKey('MIAMI')}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                      selectedNodeKey === 'MIAMI' 
-                        ? 'bg-red-900/80 border-red-500 text-red-200 shadow-xs' 
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="text-xs font-bold flex items-center justify-between">
-                      <span>🌐 Miami (+4,500 km)</span>
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-red-500/30 text-red-300">VPN</span>
-                    </div>
-                    <div className="text-[10px] opacity-80 mt-0.5">Ataque Proxy Extranjero</div>
-                  </button>
+                  {Object.values(SIMULATION_NODES).map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => setSelectedNodeKey(node.id)}
+                      className={`p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer text-left ${
+                        selectedNodeKey === node.id
+                          ? node.id === 'REAL'
+                            ? 'bg-yape-700 border-mint text-white'
+                            : 'bg-red-900/80 border-red-500 text-red-200'
+                          : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      {node.id === 'REAL' ? '📍' : '🌐'} {node.shortName}
+                    </button>
+                  ))}
                 </div>
+                <p className="text-[10px] text-slate-400 mt-1.5 font-mono">
+                  IP: {detectedGeo.ip} | Coord: {activeLat.toFixed(4)}, {activeLng.toFixed(4)} {gpsStatus ? `| ${gpsStatus}` : ''}
+                </p>
               </div>
 
-              {/* Atajos Rápidos para Demostración */}
+              {/* Atajos Rápidos */}
               <div className="pt-2 border-t border-white/10 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -976,15 +850,13 @@ export default function TransferScreen({
                     <span>Escenario Fraude</span>
                   </button>
                 </div>
-
-                {/* Botón Destacado: Demostración de Viaje Imposible */}
                 <button
                   type="button"
                   onClick={handleLoadImpossibleTravelScenario}
-                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-amber-600 to-red-600 hover:from-red-500 hover:to-amber-500 text-white border border-amber-400/40 text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <Compass className="w-4 h-4 text-mint animate-spin" style={{ animationDuration: '6s' }} />
-                  <span>DEMO JURADO: Salto Imposible (&gt;20 km en 1 min)</span>
+                  <Compass className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Demo Jurado: Viaje Imposible (+25 km en 1 min)</span>
                 </button>
               </div>
 
@@ -1090,16 +962,7 @@ export default function TransferScreen({
                     </div>
                   </div>
 
-                  {/* Explicación Técnica para el Profesor */}
-                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-300 space-y-2">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono">
-                      <GitBranch className="w-4 h-4" />
-                      <span>¿Cómo sustentar esto ante el docente o jurado?</span>
-                    </div>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">
-                      En <b>MySQL</b> solo se almacenan los campos de entrada binarios (0 o 1) y el score resultante para auditoría bancaria. El cálculo real de los <b>120 árboles de decisión</b> se ejecuta en tiempo real en la memoria RAM del servidor Python cargando el modelo serializado <code className="text-emerald-300 font-mono">random_forest_fraud.pkl</code>.
-                    </p>
-                  </div>
+
 
                 </div>
               );

@@ -34,17 +34,7 @@ export default function FraudAlertScreen({
     activeAnomalies = []
   } = riskResult || {};
 
-  // Extraer datos de viaje imposible del backend
-  const travelData = riskResult?.impossibleTravelData 
-    || transaction?.impossibleTravelData 
-    || transaction?.payloadForApproval?.impossibleTravelData;
-
-  const isImpossibleTravel = Boolean(travelData?.impossible_travel) 
-    || activeAnomalies.some(f => f.id === 'location' && (
-      f.name?.toLowerCase().includes('imposible') || 
-      f.description?.toLowerCase().includes('imposible') ||
-      f.description?.toLowerCase().includes('km/h')
-    ));
+  const travelData = transaction?.impossibleTravelData || riskResult?.impossibleTravelData;
 
   return (
     <div className="flex-1 flex flex-col justify-between bg-gradient-to-b from-slate-950 via-[#1f0606] to-slate-950 text-white animate-fade-in p-5 overflow-y-auto">
@@ -100,6 +90,11 @@ export default function FraudAlertScreen({
           </span>
         </div>
 
+        {/* Mapa Interactivo Leaflet cuando hay Viaje Imposible (Incremento 3) */}
+        {travelData && travelData.impossible_travel && (
+          <ImpossibleTravelMap travelData={travelData} />
+        )}
+
         {/* Anomalies Detected Details */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-left space-y-2">
           <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
@@ -111,7 +106,9 @@ export default function FraudAlertScreen({
             {activeAnomalies.length > 0 ? (
               activeAnomalies.map((factor) => (
                 <div key={factor.id} className="flex items-start gap-2 bg-red-950/40 border border-red-900/40 p-2 rounded-xl text-xs">
-                  <span className="text-red-400 font-bold font-mono mt-0.5">{factor.points || "+25%"}</span>
+                  <span className="text-red-400 font-bold font-mono mt-0.5">
+                    {factor.weight ? `+${factor.weight}%` : (factor.points || "+25%")}
+                  </span>
                   <div>
                     <div className="font-bold text-slate-200 text-[11px]">{factor.name}</div>
                     <div className="text-[10px] text-slate-400 leading-tight">{factor.description}</div>
@@ -125,11 +122,6 @@ export default function FraudAlertScreen({
             )}
           </div>
         </div>
-
-        {/* Mapa Interactivo Leaflet de Viaje Imposible (Incremento 3) */}
-        {isImpossibleTravel && (
-          <ImpossibleTravelMap travelData={travelData} />
-        )}
 
         {/* Security Message */}
         <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px] flex items-center gap-2 text-left">

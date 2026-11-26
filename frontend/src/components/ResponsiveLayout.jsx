@@ -25,7 +25,10 @@ import {
   ArrowRight,
   Sparkles,
   ArrowLeft,
-  Settings
+  Settings,
+  BarChart3,
+  ScanFace,
+  LockOpen
 } from 'lucide-react';
 
 export default function ResponsiveLayout({
@@ -37,6 +40,8 @@ export default function ResponsiveLayout({
   currentRisk,
   liveInputs,
   onUpdateInput,
+  onOpenBiometricEnroll,
+  onUnblockAccount,
   children
 }) {
   const [showDesktopBalance, setShowDesktopBalance] = useState(false);
@@ -190,12 +195,57 @@ export default function ResponsiveLayout({
                   >
                     Operaciones
                   </button>
+                  <button
+                    onClick={() => onNavigate('AUDITORIA')}
+                    className={`transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      currentScreen === 'AUDITORIA' 
+                        ? 'text-yape-700 font-extrabold border-b-2 border-yape-700 pb-1' 
+                        : 'text-slate-600 hover:text-yape-700'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-yape-700" />
+                    <span>Auditoría IA</span>
+                  </button>
                   <span className="text-slate-400 font-medium cursor-default">Explora</span>
                 </div>
               </div>
 
               {/* Usuario y Botón de Cerrar Sesión (Ubicado en el perfil como en BCP) */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                {onOpenBiometricEnroll && (
+                  <button
+                    type="button"
+                    onClick={onOpenBiometricEnroll}
+                    className="flex items-center gap-1.5 text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+                    title="Enrolar o registrar tu rostro con WebCam (Google MediaPipe 3D)"
+                  >
+                    <ScanFace className="w-4 h-4 text-teal-600" />
+                    <span>{user?.hasBiometrics || user?.biometriaActiva ? "Actualizar Face ID" : "Registrar Rostro"}</span>
+                  </button>
+                )}
+
+                {onUnblockAccount && (
+                  <button
+                    type="button"
+                    onClick={onUnblockAccount}
+                    className={`flex items-center gap-1.5 text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs border ${
+                      user?.cuentaBloqueada
+                        ? 'bg-red-500 text-white border-red-600 animate-pulse hover:bg-red-600'
+                        : (user?.bloqueosConsecutivos > 0 || user?.intentosFallidosBiometria > 0)
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                    }`}
+                    title="Desbloquear cuenta e inicializar intentos fallidos de biometría (Modo Pruebas)"
+                  >
+                    <LockOpen className="w-4 h-4" />
+                    <span>
+                      {user?.cuentaBloqueada 
+                        ? "🚨 Desbloquear Cuenta (24h)" 
+                        : (user?.bloqueosConsecutivos > 0 ? `Desbloquear (${user.bloqueosConsecutivos}/3 bloqueos)` : "Desbloquear")}
+                    </span>
+                  </button>
+                )}
+
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-yape-700 text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
                     {user.avatar || "AL"}
@@ -305,13 +355,42 @@ export default function ResponsiveLayout({
                     </div>
 
                     {/* Resumen de Seguridad Activa */}
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-extrabold text-slate-800">Protección Antifraude Activa</div>
+                          <div className="text-[11px] text-slate-500 font-medium">Random Forest • Biometría 3D MediaPipe</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xs font-extrabold text-slate-800">Protección Antifraude Activa</div>
-                        <div className="text-[11px] text-slate-500 font-medium">Supervisado por Random Forest • Inferencia local</div>
+                      <div className="flex items-center gap-2">
+                        {onOpenBiometricEnroll && (
+                          <button
+                            type="button"
+                            onClick={onOpenBiometricEnroll}
+                            className="text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <ScanFace className="w-3.5 h-3.5 text-teal-600" />
+                            <span>{user?.hasBiometrics || user?.biometriaActiva ? "Re-enrolar" : "Enrolar"}</span>
+                          </button>
+                        )}
+                        {onUnblockAccount && (
+                          <button
+                            type="button"
+                            onClick={onUnblockAccount}
+                            className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border ${
+                              user?.cuentaBloqueada
+                                ? 'bg-red-500 text-white border-red-600 animate-pulse'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300'
+                            }`}
+                            title="Desbloquear cuenta para pruebas"
+                          >
+                            <LockOpen className="w-3.5 h-3.5" />
+                            <span>Desbloquear</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -433,13 +512,19 @@ export default function ResponsiveLayout({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 text-xs">
-                        <span className="text-slate-500 font-medium">¿Deseas probar una simulación?</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 gap-2 text-xs">
                         <button
-                          onClick={() => onNavigate('TRANSFER')}
+                          onClick={() => onNavigate('AUDITORIA')}
                           className="font-bold text-yape-700 hover:text-yape-800 hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          <span>Ir al Formulario de Transferencia</span>
+                          <BarChart3 className="w-3.5 h-3.5" />
+                          <span>Ver Dashboard de Auditoría IA</span>
+                        </button>
+                        <button
+                          onClick={() => onNavigate('TRANSFER')}
+                          className="font-bold text-slate-600 hover:text-yape-700 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Simular Transferencia</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -448,8 +533,8 @@ export default function ResponsiveLayout({
                   </div>
 
                 </div>
-              ) : (currentScreen === 'TRANSFER' || currentScreen === 'VOUCHER') ? (
-                /* CASO TRANSFERENCIA Y VOUCHER EN ESCRITORIO: Layout Completo Nativo */
+              ) : (currentScreen === 'TRANSFER' || currentScreen === 'VOUCHER' || currentScreen === 'AUDITORIA') ? (
+                /* CASO TRANSFERENCIA, VOUCHER Y AUDITORÍA EN ESCRITORIO: Layout Completo Nativo */
                 <div className="w-full">
                   {children}
                 </div>
