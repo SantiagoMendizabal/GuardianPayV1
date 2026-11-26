@@ -1,0 +1,26 @@
+# Configuración de producción en Azure VM (vm-guardianpay - 158.23.21.237)
+# Uso en Azure:
+#   DOMAIN=guardianpay-g3.duckdns.org docker compose -f docker-compose.yml -f docker-compose.azure.yml up -d --build
+#   (Si aún no tienes dominio y solo pruebas HTTP por IP: usa DOMAIN=:80)
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: guardianpay_caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - guardianpay_caddy_data:/data
+      - guardianpay_caddy_config:/config
+
+volumes:
+  guardianpay_caddy_data:
+  guardianpay_caddy_config:

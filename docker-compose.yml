@@ -1,0 +1,59 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: guardianpay_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-GuardianPayRoot2026!}
+      MYSQL_DATABASE: ${DB_NAME:-guardianpay_db}
+      TZ: America/Lima
+    ports:
+      # Puerto 3312 en el host: libre después de 3306/3307 (local), 3308/3309 (Sumaq) y 3310/3311 (Toyota)
+      - "3312:3306"
+    volumes:
+      - guardianpay_mysql_data:/var/lib/mysql
+      - ./backend/backup/guardianpay_backup.sql:/docker-entrypoint-initdb.d/01-guardianpay_backup.sql:ro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: guardianpay_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-GuardianPayRoot2026!}
+      DB_NAME: ${DB_NAME:-guardianpay_db}
+      TZ: America/Lima
+    ports:
+      # Puerto 8001 en PC local para no chocar con 8000 (sumaq-backend) ni 5000 (toyota_backend)
+      - "8001:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+    container_name: guardianpay_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      # Puerto 3002 en PC local para no chocar con 80 (Sumaq), 8080 (Toyota) ni 3000/3001
+      - "3002:80"
+
+volumes:
+  guardianpay_mysql_data:
